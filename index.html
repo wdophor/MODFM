@@ -5,15 +5,15 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Mod FM Programmer</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;600&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
 <style>
   /* JoMoX look: brushed silver panel, black engraving, the logo red (#e7000e) for live state, dark LCD windows */
   :root {
     --bg: #aeb2b3; --panel: #e3e5e5; --field: #f6f7f7; --key: #f1f2f2; --lcd: #16181b; --lcdtext: #dadddd;
     --line: #a6aaab; --line2: #70767a; --text: #0d0e0f; --muted: #43484b; --ink: #111213;
     --accent: #e7000e; --accent-ink: #bd000b; --violet: #111213; --ok: #bd000b; --bad: #8f000a;
-    --display: "Oswald", "Arial Narrow", system-ui, sans-serif;
-    --mono: "Space Mono", ui-monospace, Menlo, Consolas, monospace;
+    --display: "Chakra Petch", "Arial Narrow", system-ui, sans-serif;
+    --mono: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
   }
   * { box-sizing: border-box; }
   [hidden] { display: none !important; }
@@ -128,6 +128,10 @@
   #log { font: 12px/1.5 var(--mono); color: var(--muted); max-height: 150px; overflow: auto; white-space: pre-wrap; margin: 0; }
   ul.tips { margin: 6px 0 0 18px; padding: 0; color: var(--muted); font-size: 13px; }
   .warn { color: var(--bad); }
+  .qflags { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 4px; }
+  .qflags label, .vcachk { display: flex; gap: 6px; align-items: center; margin: 0; font-size: 12.5px; }
+  #quick h3 { margin: 12px 0 4px; }
+  @media (max-width: 700px) { button { min-height: 40px; } input, select { font-size: 16px; } }
   @media (max-width: 520px) { .parts { grid-template-columns: repeat(4, 1fr); } }
 </style>
 </head>
@@ -159,6 +163,19 @@
     </div>
   </div>
 
+  <div class="card" id="quick">
+    <h2>Quick start</h2>
+    <div class="row">
+      <div class="field"><label for="preset">Preset</label><select id="preset"></select></div>
+      <button id="presetLoad" class="primary" type="button">Load preset</button>
+    </div>
+    <div class="qflags">
+      <label><input id="presetSend" type="checkbox" checked> Send to the module when loaded</label>
+      <label><input id="fxOk" type="checkbox"> Include global FX</label>
+    </div>
+    <p class="note" id="presetNote" style="margin:6px 0 10px">Choose a preset, then Load. Presets reset the page values first. The FX are shared by all parts, so they stay out unless ticked.</p>
+  </div>
+
   <div class="card" id="varyCard">
     <h2>Vary</h2>
     <div class="varyrow">
@@ -177,13 +194,7 @@
   <div class="bench" id="workbench"></div>
 
   <div class="card" id="library">
-    <h2>Presets and storage</h2>
-    <div class="row">
-      <div class="field"><label for="preset">Preset</label><select id="preset"></select></div>
-      <button id="presetLoad" type="button">Load preset</button>
-      <label style="display:flex;gap:6px;align-items:center;margin:0 0 8px 12px"><input id="fxOk" type="checkbox"> Include global FX in Send all</label>
-    </div>
-    <p class="note" id="presetNote" style="margin-top:8px">Presets reset the part values on this page, then apply the preset. Nothing is sent until you press Send all values. The FX are shared by all parts, so they are only sent if you tick the box.</p>
+    <h2>Program change and storage</h2>
     <div class="row" style="margin-top:12px">
       <div class="field small"><label for="pc">Program change</label><input id="pc" type="number" min="0" max="127" value="0"></div>
       <button id="pcSend" type="button">Recall</button>
@@ -228,7 +239,7 @@
       <li>On the module, turn on CC receive in MIDI Setup 2, and set the receive channel to match.</li>
       <li>Open in Chrome or Edge. Safari and Firefox may not support Web MIDI.</li>
       <li>Green values have been sent (or received). Grey ones are only on this page.</li>
-      <li>The VCA envelope in the Filter menu is not in the manual's chart, but CC 59, 60, 61 and 12 (attack, decay, sustain, release) work on a real unit.</li>
+      <li>The VCA envelope in the Filter menu is not in the manual's chart, but CC 59, 60, 61 and 62 (attack, decay, sustain, release) work on a real unit. CC 62 is also the manual's Store controller (value 64), so the page never sends a VCA release of exactly 64.</li>
       <li>The page remembers its values in this browser. Save a patch file for anything you want to keep.</li>
     </ul>
   </div>
@@ -300,7 +311,7 @@
   add('vea', 'VCA attack', 59, 127);
   add('ved', 'VCA decay', 60, 127, { def: 64 });
   add('ves', 'VCA sustain', 61, 127, { def: 127 });
-  add('ver', 'VCA release', 12, 127, { def: 40 });
+  add('ver', 'VCA release (CC 62, shared with Store)', 62, 127, { def: 40 });
   add('ftk', 'Key track', 55, 127);
   add('ftp24', '24 dB LP mix', 66, 127, { def: 127 });
   add('fmm12', '12 dB MM mix', 57, 127);
@@ -371,6 +382,8 @@
 
   function sendParam(p, v, when) {
     var ch = chanIndex(p);
+    /* CC 62 is the VCA release here and Store in the manual (value 64). Never send 64 as a release. */
+    if (p.cc === 62 && v === 64) v = 63;
     if (!sendRaw([0xB0 | ch, p.cc, v], when)) return false;
     if (when === undefined) log('ch ' + (ch + 1) + '  CC ' + p.cc + ' = ' + v + '  ' + p.label);
     return true;
@@ -620,7 +633,16 @@
         if (sendParam(byId[id], state.values[id], t0 + (i++) * GAP)) mark(id);
       });
     });
-    log('Envelope "' + shape[0] + '" on ' + (target === 'all' ? 'all operators' : 'OP' + target));
+    var vcb = $('envVca');
+    if (vcb && vcb.checked) {
+      var vids = ['vea', 'ved', 'ves', 'ver'];
+      vids.forEach(function (id, j) { setValue(id, shape[1][j], 'local'); });
+      /* the VCA envelope can miss a fast burst, so it goes out last, spaced out, and once more later */
+      [0, 350].forEach(function (extra) {
+        vids.forEach(function (id, j) { if (sendParam(byId[id], state.values[id], t0 + i * GAP + 100 + extra + j * 25) && !extra) mark(id); });
+      });
+    }
+    log('Envelope "' + shape[0] + '"' + (vcb && vcb.checked ? ' + VCA envelope' : '') + ' on ' + (target === 'all' ? 'all operators' : 'OP' + target));
     setStatus('Applied the ' + shape[0] + ' envelope to ' + (target === 'all' ? 'all four operators' : 'OP' + target) + '.', true);
   }
   function envBar() {
@@ -629,9 +651,12 @@
     var sel = el('select'); sel.id = 'envTarget'; sel.setAttribute('aria-label', 'Apply envelope shape to');
     [1, 2, 3, 4].forEach(function (n) { var o = el('option', null, 'OP' + n); o.value = n; sel.appendChild(o); });
     var all = el('option', null, 'All'); all.value = 'all'; sel.appendChild(all);
-    sel.value = '1';
+    sel.value = 'all';
     sel.addEventListener('change', function () { if (sel.value !== 'all') selectOp(parseInt(sel.value, 10)); });
     bar.appendChild(sel);
+    var vl = el('label', 'vcachk'), vc = el('input'); vc.type = 'checkbox'; vc.id = 'envVca'; vc.checked = true;
+    vl.appendChild(vc); vl.appendChild(document.createTextNode(' + VCA env'));
+    bar.appendChild(vl);
     ENVP.forEach(function (sh) {
       var b = el('button', null, sh[0]); b.type = 'button';
       b.addEventListener('click', function () { applyEnv(sel.value, sh); });
@@ -679,11 +704,24 @@
     c.appendChild(mt);
     c = panel(colA, 'Ratios', 'Tunings relative to OP1 (also on each operator strip).');
     c.appendChild(ratioBox());
+    (function () {
+      var chips = c.querySelector('.rchips'), qc = $('quick'), mainBase = $('ratioBase');
+      qc.appendChild(el('h3', null, 'Ratio presets'));
+      var br = el('div', 'envbar'); br.appendChild(el('span', 'lbl', 'Base (OP1 tune)'));
+      var qb = el('input'); qb.type = 'number'; qb.min = 0; qb.max = 127; qb.value = mainBase.value; qb.id = 'ratioBaseQ'; qb.style.width = '70px';
+      qb.addEventListener('input', function () { mainBase.value = qb.value; });
+      mainBase.addEventListener('input', function () { qb.value = mainBase.value; });
+      br.appendChild(qb); qc.appendChild(br);
+      chips.querySelector('.lbl').remove();
+      qc.appendChild(chips);
+    })();
     c.appendChild(mini(['cents'], ['OP cents (scope not documented)']));
 
     /* centre: operator envelopes */
     c = panel(colB, 'Operator envelopes', 'One ADSR per operator, shared by its level amount (EG to VCA) and its pitch amount (EG to FM). Pick a shape to set the ADSR.');
-    c.appendChild(envBar());
+    var qc = $('quick');
+    qc.appendChild(el('h3', null, 'Envelope shapes'));
+    qc.appendChild(envBar());
     [1, 2, 3, 4].forEach(function (n) { c.appendChild(opStrip(n)); });
     selectOp(1);
 
@@ -700,7 +738,7 @@
 
     c = panel(colC, 'Filter', 'Analog filter section. The filter LFO only modulates cutoff.');
     c.appendChild(mini(['fcut', 'fres', 'fshape', 'fenv', 'fatk', 'fdec', 'fsus', 'frel', 'ftk', 'ftp24', 'fmm12', 'fnoise', 'fmetal', 'flfor', 'flfow', 'flfoi']));
-    c.appendChild(el('h3', null, 'VCA envelope (CC 59 / 60 / 61 / 12)'));
+    c.appendChild(el('h3', null, 'VCA envelope (CC 59 / 60 / 61 / 62)'));
     c.appendChild(adsrViz('vca', ['vea', 'ved', 'ves', 'ver']));
     c.appendChild(mini(['vea', 'ved', 'ves', 'ver'], ['Attack', 'Decay', 'Sustain', 'Release']));
 
@@ -726,14 +764,14 @@
   })(i);
 
   /* ---------- toolbar ---------- */
-  $('sendAll').addEventListener('click', function () {
+  function doSendAll() {
     if (!state.out) { setStatus('No MIDI output selected.', false); return; }
     var withFx = $('fxOk').checked, first = ['alg', 'ovt'];
     /* OP cents (CC 96) is only sent once you have touched it, because its scope is undocumented */
     var ordered = first.map(function (id) { return byId[id]; })
       .concat(P.filter(function (p) { return p.scope === 'part' && first.indexOf(p.id) < 0 && (!p.optional || state.sent[p.id]); }))
       .concat(withFx ? P.filter(function (p) { return p.scope === 'global'; }) : []);
-    if (!window.confirm('Send ' + ordered.length + ' values on channel ' + state.chan + (withFx ? ', plus the global FX on channel 16' : ' (global FX not included)') + '?\n\nThis overwrites the sound currently loaded on that part (unsaved).')) return;
+    /* No window.confirm here: some mobile browsers suppress it, which made Send all do nothing. */
     var t0 = performance.now();
     ordered.forEach(function (p, idx) { if (sendParam(p, state.values[p.id], t0 + idx * GAP)) mark(p.id); });
     /* The VCA envelope is not reliably picked up in a fast burst (it needed a nudge on the module), so it is
@@ -744,18 +782,19 @@
     });
     log('Sent ' + ordered.length + ' values (algorithm and overtone first' + (withFx ? ', FX included' : ', FX not included') + ').');
     setStatus('Sent ' + ordered.length + ' values' + (withFx ? ' including the global FX.' : '. Global FX were not touched.'), true);
-  });
+  }
+  $('sendAll').addEventListener('click', doSendAll);
 
   /* Panic: stop stuck voices on the selected channel. All sound off / all notes off are standard MIDI
      messages that the manual does not list, so they may be ignored. The VCA sustain and release are
-     then forced to 0 (listed in the manual's CC chart plus the tested CCs 61 and 12), and note-offs go
+     then forced to 0 (listed in the manual's CC chart plus the tested CCs 61 and 62), and note-offs go
      out for the manual's note range C1-C6 (36-97). Nothing here changes the stored values on the page. */
   $('panic').addEventListener('click', function () {
     if (!state.out) { setStatus('No MIDI output selected.', false); return; }
     var ch = state.chan - 1, t0 = performance.now(), i = 0, n;
     function cc(c, v) { sendRaw([0xB0 | ch, c, v], t0 + (i++) * GAP); }
     cc(123, 0); cc(120, 0);
-    cc(61, 0); cc(12, 0);
+    cc(61, 0); cc(62, 0);
     for (n = 36; n <= 97; n++) sendRaw([0x80 | ch, n, 0], t0 + (i++) * GAP);
     log('Panic on ch ' + state.chan + ': CC 123, CC 120, VCA sustain 0, VCA release 0, note-offs 36-97.');
     setStatus('Panic sent on channel ' + state.chan + '. VCA sustain and release were forced to 0 on the module. Send all values restores them.', true);
@@ -3494,7 +3533,8 @@
     clearMarks();
     $('syxName').value = pr.name.replace(/\s*\(.*$/, '').slice(0, 13);
     $('presetNote').textContent = pr.note;
-    setStatus('Loaded "' + pr.name + '". Nothing was sent yet. Press Send all values to apply it.', true);
+    if ($('presetSend').checked && state.out) { doSendAll(); setStatus('Loaded and sent "' + pr.name + '".', true); }
+    else setStatus('Loaded "' + pr.name + '". Nothing was sent yet. Press Send all values to apply it.', true);
   });
 
   $('reset').addEventListener('click', function () {
@@ -3505,7 +3545,6 @@
 
   $('pcSend').addEventListener('click', function () {
     var n = clamp(parseInt($('pc').value, 10) || 0, 0, 127);
-    if (!window.confirm('Recall program ' + n + ' on channel ' + state.chan + '? Unsaved edits on the module will be lost.')) return;
     if (sendRaw([0xC0 | (state.chan - 1), n])) log('ch ' + state.chan + '  Program change ' + n);
   });
 
