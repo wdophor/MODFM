@@ -1,0 +1,3951 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mod FM Programmer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;600&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  /* JoMoX look: brushed silver panel, black engraving, the logo red (#e7000e) for live state, dark LCD windows */
+  :root {
+    --bg: #aeb2b3; --panel: #e3e5e5; --field: #f6f7f7; --key: #f1f2f2; --lcd: #16181b; --lcdtext: #dadddd;
+    --line: #a6aaab; --line2: #70767a; --text: #0d0e0f; --muted: #43484b; --ink: #111213;
+    --accent: #e7000e; --accent-ink: #bd000b; --violet: #111213; --ok: #bd000b; --bad: #8f000a;
+    --display: "Oswald", "Arial Narrow", system-ui, sans-serif;
+    --mono: "Space Mono", ui-monospace, Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body {
+    margin: 0; padding: 20px 16px 40px; color: var(--text);
+    background: repeating-linear-gradient(90deg, rgba(255, 255, 255, .08) 0 1px, rgba(0, 0, 0, .03) 1px 3px), var(--bg);
+    font: 13px/1.5 var(--mono);
+  }
+  main { max-width: 1000px; margin: 0 auto; }
+  h1 { font: 600 28px/1.1 var(--display); letter-spacing: .06em; text-transform: uppercase; margin: 0 0 6px; }
+  h1::after { content: ""; display: block; width: 56px; height: 3px; margin-top: 8px; background: linear-gradient(90deg, var(--accent) 0 70%, var(--ink) 70%); }
+  h2 { font: 600 14px/1.2 var(--display); letter-spacing: .1em; text-transform: uppercase; margin: 0 0 6px; color: var(--ink); }
+  h2::before { content: ""; display: inline-block; width: 9px; height: 9px; margin-right: 8px; background: var(--accent); }
+  .sub { color: var(--muted); margin: 0 0 16px; max-width: 80ch; }
+  .note { color: var(--muted); font-size: 12px; margin: 0 0 10px; }
+  .card { background: linear-gradient(180deg, #eceeee, #dcdfdf); border: 1px solid #8b9093; border-top: 3px solid var(--ink); border-radius: 3px; padding: 14px; margin-bottom: 14px; box-shadow: 0 1px 0 rgba(255, 255, 255, .5) inset, 0 2px 4px rgba(0, 0, 0, .18); }
+  .consolebar { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 10px 20px; align-items: end; margin-top: 12px; }
+  .consolebar .toolbar { margin-top: 0; justify-content: flex-end; }
+  @media (max-width: 900px) { .consolebar { grid-template-columns: 1fr; } .consolebar .toolbar { justify-content: flex-start; } }
+  .bench { display: grid; grid-template-columns: minmax(280px, 1fr) minmax(400px, 1.4fr) minmax(280px, 1fr); gap: 14px; align-items: start; margin-bottom: 14px; }
+  .bench .col { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+  .bench .card { margin: 0; }
+  @media (max-width: 1150px) { .bench { grid-template-columns: minmax(0, 1fr); } }
+  main { max-width: 1480px; }
+  .mini { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px 14px; }
+  .mini .span2 { grid-column: span 2; }
+  .viz svg { width: 100%; height: auto; display: block; }
+  .viz .node circle { fill: var(--field); stroke: var(--ink); stroke-width: 2; cursor: pointer; }
+  .viz .node text { fill: var(--text); font: 600 15px var(--display); pointer-events: none; }
+  .viz .node.car circle { fill: var(--accent); stroke: var(--ink); }
+  .viz .node.car text { fill: #fff; }
+  .viz .node.sel circle { stroke: var(--ink); stroke-width: 5; }
+  .viz .edge { fill: none; stroke: var(--ink); stroke-linecap: round; }
+  .viz .tip { fill: var(--ink); }
+  .viz .amt { fill: var(--text); font: 10px var(--mono); paint-order: stroke; stroke: #e6e8e8; stroke-width: 3px; text-anchor: middle; font-weight: 700; }
+  .mtx table { min-width: 0; }
+  .mtx th:first-child { width: 48px; }
+  .mtx td { padding: 3px 2px; }
+  .mtx .ctl output { display: none; }
+  .envbar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 4px 0 8px; }
+  .envbar button { padding: 4px 10px; font-size: 12px; }
+  .envbar select { width: auto; padding: 4px 8px; }
+  .envbar .lbl { color: var(--muted); font-size: 11.5px; letter-spacing: .04em; }
+  .opstrip { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 6px 16px; padding: 10px 6px; border-top: 1px solid var(--line); border-left: 3px solid transparent; }
+  .opstrip.sel { border-left-color: var(--accent); background: linear-gradient(90deg, rgba(231, 0, 14, .08), transparent 70%); }
+  .ophead { display: flex; gap: 8px; align-items: center; cursor: pointer; margin-bottom: 4px; }
+  .opname { font: 600 15px var(--display); letter-spacing: .08em; }
+  .adsr svg { width: 100%; height: auto; display: block; background: var(--lcd); border: 2px solid #6b7175; border-radius: 3px; }
+  .adsr .fill { fill: rgba(231, 0, 14, .38); }
+  .adsr .line { fill: none; stroke: var(--lcdtext); stroke-width: 2; stroke-linejoin: round; }
+  .mini > * { min-width: 0; }
+  @media (max-width: 700px) { .opstrip { grid-template-columns: minmax(0, 1fr); } .mini { grid-template-columns: repeat(2, minmax(0, 1fr)); } .mini .span2 { grid-column: span 2; } }
+  details.card > summary { cursor: pointer; font: 600 14px/1.2 var(--display); letter-spacing: .1em; text-transform: uppercase; color: var(--ink); }
+  details.card[open] > summary { margin-bottom: 10px; }
+  .varyrow { display: flex; gap: 12px 16px; flex-wrap: wrap; align-items: center; }
+  .amtbox { display: flex; align-items: center; gap: 8px; flex: 0 1 240px; min-width: 150px; }
+  .amtbox input { flex: 1; min-width: 0; accent-color: var(--accent); }
+  .amtbox output { min-width: 3em; text-align: right; font-weight: 700; }
+  .scopes, .varyflags { display: flex; gap: 6px 16px; flex-wrap: wrap; }
+  .varyflags { margin-top: 10px; }
+  .scopes label, .varyflags label { display: flex; gap: 6px; align-items: center; margin: 0; color: var(--text); font-size: 12px; }
+  .scopes input, .varyflags input { accent-color: var(--accent); }
+  .rchips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+  .rchips button { padding: 4px 10px; font-size: 12px; }
+  .syx { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px 10px; align-items: end; margin-top: 10px; }
+  .syx .wide { grid-column: span 2; }
+  .syxflags { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 10px; }
+  .syxflags label { display: flex; gap: 6px; align-items: center; margin: 0; }
+  .tag { display: inline-block; padding: 1px 8px; border: 1px solid var(--line2); border-radius: 2px; font-size: 11.5px; color: var(--muted); }
+  .tag.on { color: #fff; background: var(--accent); border-color: var(--accent); }
+  input[type=text] { background: var(--field); color: var(--text); border: 1px solid var(--line2); border-radius: 3px; padding: 7px 9px; font: inherit; min-width: 0; width: 100%; }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; }
+  .field { flex: 1 1 200px; }
+  .field.small { flex: 0 1 100px; }
+  label { color: var(--muted); font-size: 11.5px; letter-spacing: .04em; display: block; margin-bottom: 3px; }
+  select, input[type=number] {
+    background: var(--field); color: var(--text); border: 1px solid var(--line2);
+    border-radius: 3px; padding: 7px 9px; font: inherit; min-width: 0; width: 100%;
+  }
+  button {
+    background: linear-gradient(180deg, #fafbfb, #dfe1e1); color: var(--text); border: 1px solid var(--line2);
+    border-radius: 3px; padding: 8px 14px; font: inherit; cursor: pointer; box-shadow: 0 1px 0 rgba(0, 0, 0, .15);
+  }
+  button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent-ink); }
+  button:disabled { opacity: .4; cursor: not-allowed; }
+  button.primary { background: var(--accent); border-color: #8f000a; color: #fff; }
+  button.primary:hover:not(:disabled) { color: #fff; background: #c4000c; }
+  button.active { border-color: var(--accent); background: rgba(231, 0, 14, .14); color: var(--accent-ink); }
+  button.danger { border-color: var(--bad); color: var(--bad); }
+  :focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+  #status { margin-top: 10px; font-size: 12.5px; padding: 8px 10px; border-radius: 3px; background: var(--lcd); color: #ff8a92; border: 2px solid #6b7175; }
+  #status.ok { color: var(--lcdtext); }
+  .parts { display: grid; grid-template-columns: repeat(8, 1fr); gap: 8px; }
+  .parts button { padding: 10px 0; }
+  .list { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 10px 16px; }
+  .ctl .line { display: flex; align-items: center; gap: 8px; }
+  .ctl input[type=range] { flex: 1; min-width: 0; accent-color: var(--accent); }
+  .ctl output { min-width: 3em; text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
+  .ctl.sent output { color: var(--accent-ink); font-weight: 700; }
+  .scroll { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; min-width: 680px; table-layout: fixed; }
+  th, td { padding: 4px 6px; text-align: left; vertical-align: middle; }
+  th { color: var(--muted); font-weight: 400; font-size: 11.5px; letter-spacing: .06em; text-transform: uppercase; }
+  th:first-child { width: 80px; }
+  td .ctl input[type=range] { width: 100%; min-width: 0; }
+  td .ctl output { min-width: 2.4em; }
+  .field.mid { flex: 0 1 190px; }
+  td.dash { color: var(--muted); text-align: center; }
+  h3 { font: 600 12.5px/1.2 var(--display); letter-spacing: .1em; text-transform: uppercase; margin: 14px 0 6px; color: #3a3f41; }
+  .ratio { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
+  .toolbar { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+  #log { font: 12px/1.5 var(--mono); color: var(--muted); max-height: 150px; overflow: auto; white-space: pre-wrap; margin: 0; }
+  ul.tips { margin: 6px 0 0 18px; padding: 0; color: var(--muted); font-size: 13px; }
+  .warn { color: var(--bad); }
+  @media (max-width: 520px) { .parts { grid-template-columns: repeat(4, 1fr); } }
+</style>
+</head>
+<body>
+<main>
+  <h1>Mod FM Programmer</h1>
+  <p class="sub">Every control sends MIDI as you move it. The sliders show what this page last sent. To start from what is on the module, fetch a dump in the SysEx card below.</p>
+
+  <div class="card" id="console">
+    <div class="row">
+      <div class="field"><label for="portOut">MIDI output</label><select id="portOut"></select></div>
+      <div class="field small"><label for="chan">Part channel</label><select id="chan"></select></div>
+      <div class="field"><label for="portIn">MIDI input (optional)</label><select id="portIn"></select></div>
+    </div>
+    <div id="status" role="status" aria-live="polite">Waiting for MIDI access...</div>
+    <div class="consolebar">
+      <div>
+        <label>Edit target (multi mode, CC 33)</label>
+        <div class="parts" id="parts"></div>
+      </div>
+      <div class="toolbar">
+        <button id="sendAll" class="primary" type="button">Send all values</button>
+        <button id="save" type="button">Save patch file</button>
+        <button id="loadBtn" type="button">Load patch file</button>
+        <button id="reset" type="button">Reset page</button>
+        <button id="panic" class="danger" type="button" title="Stops stuck notes on the selected channel">Panic</button>
+        <input id="loadFile" type="file" accept=".json,application/json" hidden>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" id="varyCard">
+    <h2>Vary</h2>
+    <div class="varyrow">
+      <button id="varyGo" class="primary" type="button">Vary</button>
+      <button id="varyUndo" type="button" disabled>Undo</button>
+      <div class="amtbox"><input id="varyAmt" type="range" min="5" max="100" value="15" aria-label="Amount of variation"><output id="varyAmtV">15%</output></div>
+      <div class="scopes" id="varyScopes"></div>
+    </div>
+    <div class="varyflags">
+      <label><input id="varySnap" type="checkbox"> Snap tuning to whole ratios</label>
+      <label><input id="varySend" type="checkbox" checked> Send changes to the module</label>
+    </div>
+    <p class="note" style="margin:8px 0 0">Only the ticked sections move. Always held: volume, the VCA envelope, OP cents, and LFO mode and octave. Carriers keep a level, and resonance stays under 60.</p>
+  </div>
+
+  <div class="bench" id="workbench"></div>
+
+  <div class="card" id="library">
+    <h2>Presets and storage</h2>
+    <div class="row">
+      <div class="field"><label for="preset">Preset</label><select id="preset"></select></div>
+      <button id="presetLoad" type="button">Load preset</button>
+      <label style="display:flex;gap:6px;align-items:center;margin:0 0 8px 12px"><input id="fxOk" type="checkbox"> Include global FX in Send all</label>
+    </div>
+    <p class="note" id="presetNote" style="margin-top:8px">Presets reset the part values on this page, then apply the preset. Nothing is sent until you press Send all values. The FX are shared by all parts, so they are only sent if you tick the box.</p>
+    <div class="row" style="margin-top:12px">
+      <div class="field small"><label for="pc">Program change</label><input id="pc" type="number" min="0" max="127" value="0"></div>
+      <button id="pcSend" type="button">Recall</button>
+      <label style="display:flex;gap:6px;align-items:center;margin:0 0 8px 12px"><input id="storeOk" type="checkbox"> Allow Store</label>
+      <button id="store" type="button" disabled>Store (CC 62)</button>
+    </div>
+    <p class="note" style="margin-top:8px">Recall discards unsaved edits. Store has no undo, and the manual doesn't say which slot CC 62 writes to, so check the module's display first. Another editor reports that CC 62 only arms the store on some units: if the preset reverts after a power cycle, press Store twice on the panel.</p>
+  </div>
+
+  <div class="card" id="syxCard">
+    <h2>Whole preset (SysEx)</h2>
+    <p class="note">Sends every value as one message, VCA envelope included, instead of a burst of CCs. It starts from a real dump of your module, so the settings this page doesn't know about stay as your unit has them. Fetch one first: on the module go to Midi, Setup 3, and turn 1Prs.</p>
+    <div class="row">
+      <span class="tag" id="syxTpl">Template: none</span>
+      <span class="tag" id="syxAccess">SysEx: checking</span>
+    </div>
+    <div class="syx">
+      <button id="syxFetch" type="button">Fetch from module</button>
+      <button id="syxOpen" type="button">Open .syx</button>
+      <button id="syxSave" type="button">Save .syx</button>
+      <div class="wide"><label for="syxName">Preset name (13 characters)</label><input id="syxName" type="text" maxlength="13" value="Programmer"></div>
+      <div><label for="syxSlot">Slot (0-127)</label><input id="syxSlot" type="number" min="0" max="127" value="0"></div>
+      <button id="syxSend" class="primary" type="button" disabled>Send preset</button>
+    </div>
+    <div class="syxflags">
+      <label><input id="syxStore" type="checkbox"> Also send Store (CC 62) afterwards</label>
+    </div>
+    <div class="row" id="syxBankRow" style="margin-top:12px" hidden>
+      <div class="field"><label for="syxBank">Bank slot</label><select id="syxBank"></select></div>
+      <button id="syxBankLoad" type="button">Load into editor</button>
+    </div>
+    <p class="note" style="margin-top:10px">Sending writes to the module's working memory for that slot. Press Store (or tick the box) to keep it, otherwise a power cycle wipes it. The module's own docs say big transfers can corrupt it, so this only ever sends one 283-byte preset. FM 1&gt;3 has no place in the dump, so it goes out as a CC afterwards.</p>
+    <input id="syxFile" type="file" accept=".syx,application/octet-stream" hidden>
+  </div>
+
+  <div id="sections"></div>
+
+  <div class="card">
+    <h2>Log</h2>
+    <pre id="log">Nothing sent yet.</pre>
+    <ul class="tips">
+      <li>On the module, turn on CC receive in MIDI Setup 2, and set the receive channel to match.</li>
+      <li>Open in Chrome or Edge. Safari and Firefox may not support Web MIDI.</li>
+      <li>Green values have been sent (or received). Grey ones are only on this page.</li>
+      <li>The VCA envelope in the Filter menu is not in the manual's chart, but CC 59, 60, 61 and 12 (attack, decay, sustain, release) work on a real unit.</li>
+      <li>The page remembers its values in this browser. Save a patch file for anything you want to keep.</li>
+    </ul>
+  </div>
+</main>
+
+<script>
+(function () {
+  'use strict';
+
+  /* Parameter table, from the manual's MIDI Implementation (CC chart, appendix pp. 43-44).
+     scope 'part' = sent on the part channel, 'global' = FX, always channel 16. */
+  var P = [], byId = {}, byCC = { part: {}, global: {} };
+
+  function add(id, label, cc, max, o) {
+    o = o || {};
+    var p = { id: id, label: label, cc: cc, max: max, scope: o.scope || 'part',
+              options: o.options || null, def: o.def || 0, optional: !!o.optional };
+    P.push(p); byId[id] = p; byCC[p.scope][cc] = p;
+  }
+  function pad(n) { return n < 10 ? '0' + n : '' + n; }
+
+  var ALG = [], OVT = [];
+  for (var i = 0; i <= 26; i++) ALG.push('AL ' + pad(i) + (i === 0 ? ' (free matrix)' : ''));
+  for (i = 0; i <= 5; i++) OVT.push('OVT ' + i);
+
+  add('alg', 'Algorithm', 42, 26, { options: ALG });
+  add('ovt', 'Overtone mode', 67, 5, { options: OVT });
+  add('vol', 'Volume', 7, 127, { def: 100 });
+
+  [1, 2, 3, 4].forEach(function (n) {
+    add('tune' + n, 'OP' + n + ' tune (semitones)', 99 + n, 127);
+  });
+  add('cents', 'OP cents (scope not documented)', 96, 100, { optional: true });
+
+  var cc = 104;
+  [1, 2, 3, 4].forEach(function (s) {
+    [1, 2, 3, 4].forEach(function (d) {
+      if (s !== d) add('fm' + s + d, 'FM ' + s + '→' + d, cc++, 127);
+    });
+  });
+
+  [1, 2, 3, 4].forEach(function (n) {
+    add('atk' + n, 'OP' + n + ' attack', 13 + n, 127);
+    add('dec' + n, 'OP' + n + ' decay', 17 + n, 127, { def: 64 });
+    add('sus' + n, 'OP' + n + ' sustain', 33 + n, 127, { def: 127 });
+    add('rel' + n, 'OP' + n + ' release', 37 + n, 127, { def: 40 });
+    add('vca' + n, 'OP' + n + ' level amount', 21 + n, 127, { def: 100 });
+    add('efm' + n, 'OP' + n + ' pitch amount', 25 + n, 127);
+    add('l1fm' + n, 'LFO1 → FM OP' + n, 73 + n, 127);
+    add('l2am' + n, 'LFO2 → AM OP' + n, 69 + n, 127);
+  });
+
+  [1, 2].forEach(function (n) {
+    add('l' + n + 'mix', 'LFO' + n + ' mix volume', 77 + n, 127);
+    add('l' + n + 'rate', 'LFO' + n + ' rate', 79 + n, 127);
+    add('l' + n + 'wave', 'LFO' + n + ' waveform', 81 + n, 63);
+    add('l' + n + 'oct', 'LFO' + n + ' VCO octave', 83 + n, 6);
+    add('l' + n + 'mode', 'LFO' + n + ' mode', 85 + n, 1, { options: ['LFO', 'VCO'] });
+  });
+
+  add('fcut', 'Cutoff', 43, 127, { def: 100 });
+  add('fres', 'Resonance (strong past about 60)', 44, 127);
+  add('fshape', 'Shape (LP/BP/HP)', 45, 127);
+  add('fenv', 'Env amount', 46, 127);
+  add('fatk', 'Env attack', 47, 127);
+  add('fdec', 'Env decay', 48, 127, { def: 64 });
+  add('fsus', 'Env sustain', 49, 127, { def: 127 });
+  add('frel', 'Env release', 50, 127, { def: 40 });
+  add('vea', 'VCA attack', 59, 127);
+  add('ved', 'VCA decay', 60, 127, { def: 64 });
+  add('ves', 'VCA sustain', 61, 127, { def: 127 });
+  add('ver', 'VCA release', 12, 127, { def: 40 });
+  add('ftk', 'Key track', 55, 127);
+  add('ftp24', '24 dB LP mix', 66, 127, { def: 127 });
+  add('fmm12', '12 dB MM mix', 57, 127);
+  add('fnoise', 'Noise mix', 56, 127);
+  add('fmetal', 'Noise metal', 58, 127);
+  add('flfor', 'Filter LFO rate', 69, 127);
+  add('flfow', 'Filter LFO waveform', 52, 127);
+  add('flfoi', 'Filter LFO intensity', 53, 127);
+
+  var G = { scope: 'global' };
+  add('rvsize', 'Reverb room size', 100, 127, G);
+  add('rvlp', 'Reverb low pass', 101, 127, G);
+  add('rvhp', 'Reverb high pass', 102, 127, G);
+  add('rvlev', 'Reverb level', 103, 127, G);
+  var RNG = ['Slow', 'Medium', 'Fast'];
+  add('d1time', 'Delay 1 time', 14, 127, G);
+  add('d1fb', 'Delay 1 feedback', 15, 127, G);
+  add('d1rng', 'Delay 1 range', 17, 2, { scope: 'global', options: RNG });
+  add('d1lev', 'Delay 1 level', 18, 127, G);
+  add('d2time', 'Delay 2 time', 19, 127, G);
+  add('d2fb', 'Delay 2 feedback', 20, 127, G);
+  add('d2rng', 'Delay 2 range', 21, 2, { scope: 'global', options: RNG });
+  add('d2lev', 'Delay 2 level', 22, 127, G);
+
+  /* ---------- state ---------- */
+  var STORAGE_KEY = 'modfm-programmer-v1';
+  var state = { values: {}, sent: {}, chan: 1, out: null, inp: null, target: null };
+  var ui = {}, access = null, logLines = [], saveTimer = null;
+  P.forEach(function (p) { state.values[p.id] = p.def; });
+
+  /* live pictures: FM routing and ADSR curves redraw whenever a value changes */
+  var viz = { fm: null, env: {} }, selOp = 1, opStrips = {};
+  function refreshViz() { if (viz.fm) viz.fm(); Object.keys(viz.env).forEach(function (k) { viz.env[k](); }); }
+  function selectOp(n) {
+    selOp = n;
+    Object.keys(opStrips).forEach(function (k) { opStrips[k].classList.toggle('sel', +k === n); });
+    var t = document.getElementById('envTarget'); if (t && t.value !== 'all') t.value = String(n);
+    if (viz.fm) viz.fm();
+  }
+
+  var $ = function (id) { return document.getElementById(id); };
+  var portOut = $('portOut'), portIn = $('portIn'), chanEl = $('chan'), statusEl = $('status'), logEl = $('log');
+
+  function el(tag, cls, text) {
+    var e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text != null) e.textContent = text;
+    return e;
+  }
+  function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+  function setStatus(text, ok) { statusEl.textContent = text; statusEl.className = ok ? 'ok' : ''; }
+  function log(text) {
+    logLines.unshift(text); logLines = logLines.slice(0, 40);
+    logEl.textContent = logLines.join('\n');
+  }
+  function labelOf(p, v) { return p.options ? p.options[v] : String(v); }
+
+  /* ---------- MIDI out ---------- */
+  /* Gap between messages in a burst. Another Mod FM editor reports the unit drops CCs sent faster than about 8 ms apart, so stay above that. */
+  var GAP = 10;
+  function sendRaw(bytes, when) {
+    if (!state.out) { setStatus('No MIDI output selected.', false); return false; }
+    try { state.out.send(bytes, when); }
+    catch (e) { setStatus('Send failed: ' + e.message, false); return false; }
+    return true;
+  }
+  function chanIndex(p) { return p.scope === 'global' ? 15 : state.chan - 1; }
+
+  function sendParam(p, v, when) {
+    var ch = chanIndex(p);
+    if (!sendRaw([0xB0 | ch, p.cc, v], when)) return false;
+    if (when === undefined) log('ch ' + (ch + 1) + '  CC ' + p.cc + ' = ' + v + '  ' + p.label);
+    return true;
+  }
+
+  /* ---------- values ---------- */
+  function mark(id) {
+    state.sent[id] = true;
+    if (ui[id]) ui[id].root.classList.add('sent');
+  }
+  function clearMarks() {
+    state.sent = {};
+    Object.keys(ui).forEach(function (id) { ui[id].root.classList.remove('sent'); });
+  }
+  /* mode: 'send' = user moved it, 'remote' = came from the module, 'local' = page only */
+  function setValue(id, v, mode) {
+    var p = byId[id];
+    if (!p) return;
+    v = clamp(Math.round(v), 0, p.max);
+    state.values[id] = v;
+    var u = ui[id];
+    if (u) {
+      if (u.input.value !== String(v)) u.input.value = v;
+      u.out.textContent = labelOf(p, v);
+    }
+    if (mode === 'send') { if (sendParam(p, v)) mark(id); }
+    else if (mode === 'remote') mark(id);
+    refreshViz();
+    persistSoon();
+  }
+
+  /* ---------- controls ---------- */
+  function control(id, text, compact) {
+    var p = byId[id];
+    var root = el('div', 'ctl'), out = el('output'), input;
+    if (p.options) {
+      input = el('select');
+      p.options.forEach(function (name, i) { var o = el('option', null, name); o.value = i; input.appendChild(o); });
+    } else {
+      input = el('input'); input.type = 'range'; input.min = 0; input.max = p.max; input.step = 1;
+    }
+    input.id = 'c-' + id;
+    input.value = state.values[id];
+    var name = text || p.label;
+    if (compact) input.setAttribute('aria-label', name);
+    else { var lab = el('label', null, name); lab.htmlFor = input.id; root.appendChild(lab); }
+    input.addEventListener('input', function () { setValue(id, parseInt(input.value, 10), 'send'); });
+    var line = el('div', 'line');
+    line.appendChild(input);
+    if (!p.options) line.appendChild(out);
+    root.appendChild(line);
+    out.textContent = labelOf(p, state.values[id]);
+    ui[id] = { input: input, out: out, root: root };
+    return root;
+  }
+
+  function card(title, note) {
+    var c = el('section', 'card');
+    c.appendChild(el('h2', null, title));
+    if (note) c.appendChild(el('p', 'note', note));
+    $('sections').appendChild(c);
+    return c;
+  }
+  function list(ids) {
+    var d = el('div', 'list');
+    ids.forEach(function (id) { d.appendChild(control(id)); });
+    return d;
+  }
+  function table(headers, rows) {
+    var wrap = el('div', 'scroll'), t = el('table'), th = el('thead'), hr = el('tr');
+    headers.forEach(function (h) { hr.appendChild(el('th', null, h)); });
+    th.appendChild(hr); t.appendChild(th);
+    var tb = el('tbody');
+    rows.forEach(function (cells) {
+      var tr = el('tr');
+      cells.forEach(function (c, idx) {
+        var td = el(idx === 0 ? 'th' : 'td');
+        if (typeof c === 'string') { td.textContent = c; if (c === '-') td.className = 'dash'; }
+        else td.appendChild(c);
+        tr.appendChild(td);
+      });
+      tb.appendChild(tr);
+    });
+    t.appendChild(tb); wrap.appendChild(t);
+    return wrap;
+  }
+
+  /* Ratios in semitones (equal temperament), for OVT 0 */
+  var RATIOS = [['1:2', 0.5], ['1:1', 1], ['4:3', 4 / 3], ['3:2', 1.5], ['2:1', 2], ['5:2', 2.5],
+                ['3:1', 3], ['4:1', 4], ['5:1', 5], ['6:1', 6], ['7:1', 7], ['8:1', 8]];
+  function semis(r) { return Math.round(12 * Math.log(r) / Math.LN2); }
+  function errCents(r) { return Math.round(100 * semis(r) - 1200 * Math.log(r) / Math.LN2); }
+
+  /* semitone offsets of OP2, OP3, OP4 above OP1 (OP1 is the base) */
+  var RPRESETS = [['Unison', [0, 0, 0]], ['Octaves', [12, 24, 36]], ['Harmonics 1-4', [12, 19, 24]], ['Odd harmonics', [19, 28, 34]],
+                  ['Even harmonics', [12, 24, 31]], ['Fifths', [7, 12, 19]], ['Sub + body', [0, 12, 0]], ['Bell', [6, 12, 22]],
+                  ['Metallic', [17, 25, 32]], ['Fat unison', [0, 0, 12]]];
+  function applyRatioPreset(rp, base) {
+    var t0 = performance.now(), i = 0, clipped = false;
+    function put(id, v) { setValue(id, v, 'local'); if (sendParam(byId[id], state.values[id], t0 + (i++) * GAP)) mark(id); }
+    put('tune1', base);
+    rp[1].forEach(function (off, k) { var v = base + off; if (v > 127) clipped = true; put('tune' + (k + 2), Math.min(127, v)); });
+    setStatus('Ratio preset "' + rp[0] + '" on a base of ' + base + (clipped ? '. One tuning hit 127, so lower the base.' : '.') + ' Equal-tempered, so it applies in OVT 0.', !clipped);
+  }
+  function ratioBox() {
+    var box = el('div', 'ratio'), row = el('div', 'row');
+    var b = el('div', 'field small');
+    b.appendChild(el('label', null, 'Base (OP1 tune)')); b.lastChild.htmlFor = 'ratioBase';
+    var base = el('input'); base.type = 'number'; base.min = 0; base.max = 127; base.value = 0; base.id = 'ratioBase';
+    b.appendChild(base); row.appendChild(b);
+    var defaults = { 2: 4, 3: 6, 4: 1 };
+    [2, 3, 4].forEach(function (n) {
+      var f = el('div', 'field mid'), l = el('label', null, 'OP' + n + ' ratio');
+      l.htmlFor = 'ratio' + n;
+      var s = el('select'); s.id = 'ratio' + n;
+      RATIOS.forEach(function (r, idx) {
+        var e = r[1] === 1 ? 0 : errCents(r[1]), sm = semis(r[1]);
+        var o = el('option', null, r[0] + '  (' + (sm >= 0 ? '+' : '') + sm + ' st, ' + (e > 0 ? '+' : '') + e + '¢)');
+        o.value = idx; s.appendChild(o);
+      });
+      s.value = defaults[n];
+      f.appendChild(l); f.appendChild(s); row.appendChild(f);
+    });
+    var go = el('button', null, 'Apply ratios'); go.type = 'button';
+    go.addEventListener('click', function () {
+      var bv = clamp(parseInt(base.value, 10) || 0, 0, 127);
+      setValue('tune1', bv, 'send');
+      var clipped = false;
+      [2, 3, 4].forEach(function (n) {
+        var r = RATIOS[parseInt($('ratio' + n).value, 10)][1], v = bv + semis(r);
+        if (v < 0 || v > 127) clipped = true;
+        setValue('tune' + n, v, 'send');
+      });
+      setStatus(clipped ? 'Applied, but one tuning hit the 0-127 limit. Raise the base for sub ratios.' : 'Applied tunings relative to OP1.', !clipped);
+    });
+    row.appendChild(go);
+    var chips = el('div', 'rchips');
+    chips.appendChild(el('span', 'lbl', 'Presets'));
+    RPRESETS.forEach(function (rp) {
+      var b = el('button', null, rp[0]); b.type = 'button';
+      b.title = 'OP1 1 : OP2 ' + (Math.pow(2, rp[1][0] / 12)).toFixed(2) + ' : OP3 ' + (Math.pow(2, rp[1][1] / 12)).toFixed(2) + ' : OP4 ' + (Math.pow(2, rp[1][2] / 12)).toFixed(2);
+      b.addEventListener('click', function () { applyRatioPreset(rp, clamp(parseInt(base.value, 10) || 0, 0, 127)); });
+      chips.appendChild(b);
+    });
+    box.appendChild(chips);
+    box.appendChild(row);
+    box.appendChild(el('p', 'note', 'Ratios are equal-tempered semitones, so they only apply in OVT 0 and 3:1 is about 2 cents flat. Ratios below 1:1 need a base of 12 or more. OVT 1+ locks exact integer ratios.'));
+    return box;
+  }
+
+  var NS = 'http://www.w3.org/2000/svg';
+  function sv(tag, attrs, parent) {
+    var n = document.createElementNS(NS, tag);
+    Object.keys(attrs || {}).forEach(function (k) { n.setAttribute(k, attrs[k]); });
+    if (parent) parent.appendChild(n);
+    return n;
+  }
+  function panel(parent, title, note) {
+    var c = el('section', 'card');
+    c.appendChild(el('h2', null, title));
+    if (note) c.appendChild(el('p', 'note', note));
+    parent.appendChild(c);
+    return c;
+  }
+  function mini(ids, labels) {
+    var d = el('div', 'mini');
+    ids.forEach(function (id, i) { d.appendChild(control(id, labels ? labels[i] : null)); });
+    return d;
+  }
+
+  /* carriers by algorithm, from the manual's appendix diagrams; unknown algorithms fall back to operators with a level amount */
+  var CARR = { 1: [1], 3: [1], 5: [1], 7: [1], 9: [1, 2], 11: [1, 2], 13: [1, 3], 14: [1, 3], 15: [1, 2], 17: [1], 19: [1, 2, 3], 21: [1, 2, 3], 23: [1] };
+  function carriers() {
+    var a = state.values.alg;
+    if (CARR[a]) return CARR[a];
+    return [1, 2, 3, 4].filter(function (n) { return state.values['vca' + n] > 0; });
+  }
+
+  /* FM routing picture: line weight is the matrix amount, filled circles are carriers */
+  function fmViz() {
+    var wrap = el('div', 'viz');
+    var s = sv('svg', { viewBox: '0 0 300 240', role: 'img', 'aria-label': 'FM routing between the four operators' }, wrap);
+    var pos = { 1: [150, 36], 2: [264, 120], 3: [150, 204], 4: [36, 120] };
+    var edges = sv('g', {}, s), nodes = sv('g', {}, s), grp = {};
+    [1, 2, 3, 4].forEach(function (n) {
+      var g = sv('g', { 'class': 'node', tabindex: '0', role: 'button', 'aria-label': 'Select operator ' + n }, nodes);
+      sv('circle', { cx: pos[n][0], cy: pos[n][1], r: 20 }, g);
+      sv('text', { x: pos[n][0], y: pos[n][1] + 5, 'text-anchor': 'middle' }, g).textContent = n;
+      g.addEventListener('click', function () { selectOp(n); });
+      g.addEventListener('keydown', function (ev) { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); selectOp(n); } });
+      grp[n] = g;
+    });
+    viz.fm = function () {
+      while (edges.firstChild) edges.removeChild(edges.firstChild);
+      var car = carriers();
+      [1, 2, 3, 4].forEach(function (a) {
+        [1, 2, 3, 4].forEach(function (d) {
+          var v = state.values['fm' + a + d];
+          if (a === d || !v) return;
+          var p = pos[a], q = pos[d], dx = q[0] - p[0], dy = q[1] - p[1], len = Math.sqrt(dx * dx + dy * dy);
+          var ux = dx / len, uy = dy / len, nx = -uy, ny = ux, off = 9;
+          var sx = p[0] + ux * 23 + nx * off, sy = p[1] + uy * 23 + ny * off;
+          var ex = q[0] - ux * 26 + nx * off, ey = q[1] - uy * 26 + ny * off;
+          var cx = (p[0] + q[0]) / 2 + nx * off * 2.2, cy = (p[1] + q[1]) / 2 + ny * off * 2.2;
+          var w = 1 + v / 127 * 6, op = 0.35 + 0.65 * v / 127;
+          sv('path', { 'class': 'edge', d: 'M' + sx + ' ' + sy + ' Q' + cx + ' ' + cy + ' ' + ex + ' ' + ey, 'stroke-width': w, 'stroke-opacity': op }, edges);
+          var tx = ex - cx, ty = ey - cy, tl = Math.sqrt(tx * tx + ty * ty); tx /= tl; ty /= tl;
+          var hx = ex - tx * 8, hy = ey - ty * 8, hw = 3.5 + w / 2;
+          sv('polygon', { 'class': 'tip', points: ex + ',' + ey + ' ' + (hx - ty * hw) + ',' + (hy + tx * hw) + ' ' + (hx + ty * hw) + ',' + (hy - tx * hw), 'fill-opacity': op }, edges);
+          var mx = 0.25 * sx + 0.5 * cx + 0.25 * ex, my = 0.25 * sy + 0.5 * cy + 0.25 * ey;
+          sv('text', { 'class': 'amt', x: mx, y: my + 3 }, edges).textContent = v;
+        });
+      });
+      [1, 2, 3, 4].forEach(function (n) {
+        grp[n].setAttribute('class', 'node' + (car.indexOf(n) >= 0 ? ' car' : '') + (selOp === n ? ' sel' : ''));
+      });
+    };
+    viz.fm();
+    return wrap;
+  }
+
+  /* ADSR curve from four values: attack, decay and release are drawn as relative times, sustain as a level */
+  function adsrViz(key, ids) {
+    var wrap = el('div', 'adsr');
+    var s = sv('svg', { viewBox: '0 0 160 60', role: 'img', 'aria-label': 'Envelope shape' }, wrap);
+    var fill = sv('path', { 'class': 'fill' }, s), line = sv('path', { 'class': 'line' }, s);
+    viz.env[key] = function () {
+      var a = state.values[ids[0]], d = state.values[ids[1]], su = state.values[ids[2]], r = state.values[ids[3]];
+      var wa = 4 + a / 127 * 40, wd = 4 + d / 127 * 46, wh = 22, wr = 4 + r / 127 * 40, k = 148 / (wa + wd + wh + wr);
+      var x1 = 6 + wa * k, x2 = x1 + wd * k, x3 = x2 + wh * k, x4 = x3 + wr * k, top = 6, bot = 54, ys = bot - su / 127 * (bot - top);
+      var path = 'M6 ' + bot + ' L' + x1 + ' ' + top + ' L' + x2 + ' ' + ys + ' L' + x3 + ' ' + ys + ' L' + x4 + ' ' + bot;
+      line.setAttribute('d', path); fill.setAttribute('d', path + ' Z');
+    };
+    viz.env[key]();
+    return wrap;
+  }
+
+  /* envelope shapes: attack, decay, sustain, release */
+  var ENVP = [['Pluck', [0, 45, 0, 35]], ['Perc', [0, 25, 0, 20]], ['Stab', [0, 55, 60, 40]], ['Organ', [0, 0, 127, 25]],
+              ['Pad', [90, 110, 115, 100]], ['Swell', [105, 80, 127, 95]], ['Bell', [0, 105, 0, 100]], ['Drone', [30, 0, 127, 80]]];
+  function applyEnv(target, shape) {
+    var ops = target === 'all' ? [1, 2, 3, 4] : [parseInt(target, 10)], t0 = performance.now(), i = 0;
+    ops.forEach(function (n) {
+      ['atk', 'dec', 'sus', 'rel'].forEach(function (k, j) {
+        var id = k + n;
+        setValue(id, shape[1][j], 'local');
+        if (sendParam(byId[id], state.values[id], t0 + (i++) * GAP)) mark(id);
+      });
+    });
+    log('Envelope "' + shape[0] + '" on ' + (target === 'all' ? 'all operators' : 'OP' + target));
+    setStatus('Applied the ' + shape[0] + ' envelope to ' + (target === 'all' ? 'all four operators' : 'OP' + target) + '.', true);
+  }
+  function envBar() {
+    var bar = el('div', 'envbar');
+    bar.appendChild(el('span', 'lbl', 'Shape'));
+    var sel = el('select'); sel.id = 'envTarget'; sel.setAttribute('aria-label', 'Apply envelope shape to');
+    [1, 2, 3, 4].forEach(function (n) { var o = el('option', null, 'OP' + n); o.value = n; sel.appendChild(o); });
+    var all = el('option', null, 'All'); all.value = 'all'; sel.appendChild(all);
+    sel.value = '1';
+    sel.addEventListener('change', function () { if (sel.value !== 'all') selectOp(parseInt(sel.value, 10)); });
+    bar.appendChild(sel);
+    ENVP.forEach(function (sh) {
+      var b = el('button', null, sh[0]); b.type = 'button';
+      b.addEventListener('click', function () { applyEnv(sel.value, sh); });
+      bar.appendChild(b);
+    });
+    return bar;
+  }
+  function opStrip(n) {
+    var strip = el('div', 'opstrip'); strip.id = 'opstrip' + n;
+    var left = el('div'), head = el('div', 'ophead');
+    head.appendChild(el('span', 'opname', 'OP ' + n));
+    var badge = el('span', 'tag', 'modulator'); head.appendChild(badge);
+    head.addEventListener('click', function () { selectOp(n); });
+    left.appendChild(head);
+    left.appendChild(adsrViz('op' + n, ['atk' + n, 'dec' + n, 'sus' + n, 'rel' + n]));
+    var prev = viz.env['op' + n];
+    viz.env['op' + n] = function () { prev(); var car = carriers().indexOf(n) >= 0; badge.textContent = car ? 'carrier' : 'modulator'; badge.className = 'tag' + (car ? ' on' : ''); };
+    viz.env['op' + n]();
+    strip.appendChild(left);
+    var m = mini(['atk' + n, 'dec' + n, 'sus' + n, 'rel' + n, 'vca' + n, 'efm' + n, 'tune' + n],
+                 ['Attack', 'Decay', 'Sustain', 'Release', 'Level amt', 'Pitch amt', 'Tune (semitones)']);
+    m.lastChild.classList.add('span2');
+    strip.appendChild(m);
+    opStrips[n] = strip;
+    return strip;
+  }
+
+  function build() {
+    var bench = $('workbench'), colA = el('div', 'col'), colB = el('div', 'col'), colC = el('div', 'col');
+    bench.appendChild(colA); bench.appendChild(colB); bench.appendChild(colC);
+
+    /* left: engine, FM routing, matrix amounts, ratios */
+    var c = panel(colA, 'Engine');
+    c.appendChild(mini(['alg', 'ovt', 'vol'], ['Algorithm', 'Overtone mode', 'Volume']));
+    c.appendChild(el('p', 'note', 'Overtone 0-5 from the MIDI chart (the manual text mentions 6). Changing the algorithm may also change the matrix amounts on the module.'));
+    c = panel(colA, 'FM matrix', 'Line weight is the amount, filled circles are carriers. Click an operator to select it.');
+    c.appendChild(fmViz());
+    var rows = [];
+    [1, 2, 3, 4].forEach(function (s) {
+      var r = ['OP' + s];
+      [1, 2, 3, 4].forEach(function (d) { r.push(s === d ? '-' : control('fm' + s + d, 'FM ' + s + ' to ' + d, true)); });
+      rows.push(r);
+    });
+    var mt = table(['from \\ to', 'OP1', 'OP2', 'OP3', 'OP4'], rows); mt.classList.add('mtx');
+    c.appendChild(mt);
+    c = panel(colA, 'Ratios', 'Tunings relative to OP1 (also on each operator strip).');
+    c.appendChild(ratioBox());
+    c.appendChild(mini(['cents'], ['OP cents (scope not documented)']));
+
+    /* centre: operator envelopes */
+    c = panel(colB, 'Operator envelopes', 'One ADSR per operator, shared by its level amount (EG to VCA) and its pitch amount (EG to FM). Pick a shape to set the ADSR.');
+    c.appendChild(envBar());
+    [1, 2, 3, 4].forEach(function (n) { c.appendChild(opStrip(n)); });
+    selectOp(1);
+
+    /* right: LFOs, filter, VCA envelope, effects */
+    c = panel(colC, 'LFOs', 'In VCO mode an LFO becomes an oscillator and its mix volume sets the level. LFO1 depth goes to operator pitch, LFO2 depth to operator volume.');
+    c.appendChild(el('h3', null, 'LFO 1'));
+    c.appendChild(mini(['l1mode', 'l1rate', 'l1wave', 'l1oct', 'l1mix'], ['Mode', 'Rate', 'Waveform', 'VCO octave', 'Mix volume']));
+    c.appendChild(el('h3', null, 'LFO 1 to FM (pitch) depth'));
+    c.appendChild(mini(['l1fm1', 'l1fm2', 'l1fm3', 'l1fm4'], ['OP1', 'OP2', 'OP3', 'OP4']));
+    c.appendChild(el('h3', null, 'LFO 2'));
+    c.appendChild(mini(['l2mode', 'l2rate', 'l2wave', 'l2oct', 'l2mix'], ['Mode', 'Rate', 'Waveform', 'VCO octave', 'Mix volume']));
+    c.appendChild(el('h3', null, 'LFO 2 to AM (volume) depth'));
+    c.appendChild(mini(['l2am1', 'l2am2', 'l2am3', 'l2am4'], ['OP1', 'OP2', 'OP3', 'OP4']));
+
+    c = panel(colC, 'Filter', 'Analog filter section. The filter LFO only modulates cutoff.');
+    c.appendChild(mini(['fcut', 'fres', 'fshape', 'fenv', 'fatk', 'fdec', 'fsus', 'frel', 'ftk', 'ftp24', 'fmm12', 'fnoise', 'fmetal', 'flfor', 'flfow', 'flfoi']));
+    c.appendChild(el('h3', null, 'VCA envelope (CC 59 / 60 / 61 / 12)'));
+    c.appendChild(adsrViz('vca', ['vea', 'ved', 'ves', 'ver']));
+    c.appendChild(mini(['vea', 'ved', 'ves', 'ver'], ['Attack', 'Decay', 'Sustain', 'Release']));
+
+    var fx = el('details', 'card');
+    fx.appendChild(el('summary', null, 'Effects (global, channel 16)'));
+    fx.appendChild(el('p', 'note', 'Reverb and the two delays are shared by all parts and always go out on MIDI channel 16.'));
+    fx.appendChild(mini(['rvsize', 'rvlp', 'rvhp', 'rvlev', 'd1time', 'd1fb', 'd1rng', 'd1lev', 'd2time', 'd2fb', 'd2rng', 'd2lev']));
+    colC.appendChild(fx);
+  }
+
+  /* ---------- parts (CC 33) ---------- */
+  var partBtns = [];
+  function setTarget(n, send) {
+    if (send && !sendRaw([0xB0 | (state.chan - 1), 33, n])) return;
+    if (send) log('ch ' + state.chan + '  CC 33 = ' + n + '  Edit target');
+    state.target = n;
+    partBtns.forEach(function (b, i) { b.classList.toggle('active', i === n); });
+  }
+  for (i = 0; i < 8; i++) (function (n) {
+    var b = el('button', null, 'Part ' + (n + 1)); b.type = 'button';
+    b.addEventListener('click', function () { setTarget(n, true); });
+    $('parts').appendChild(b); partBtns.push(b);
+  })(i);
+
+  /* ---------- toolbar ---------- */
+  $('sendAll').addEventListener('click', function () {
+    if (!state.out) { setStatus('No MIDI output selected.', false); return; }
+    var withFx = $('fxOk').checked, first = ['alg', 'ovt'];
+    /* OP cents (CC 96) is only sent once you have touched it, because its scope is undocumented */
+    var ordered = first.map(function (id) { return byId[id]; })
+      .concat(P.filter(function (p) { return p.scope === 'part' && first.indexOf(p.id) < 0 && (!p.optional || state.sent[p.id]); }))
+      .concat(withFx ? P.filter(function (p) { return p.scope === 'global'; }) : []);
+    if (!window.confirm('Send ' + ordered.length + ' values on channel ' + state.chan + (withFx ? ', plus the global FX on channel 16' : ' (global FX not included)') + '?\n\nThis overwrites the sound currently loaded on that part (unsaved).')) return;
+    var t0 = performance.now();
+    ordered.forEach(function (p, idx) { if (sendParam(p, state.values[p.id], t0 + idx * GAP)) mark(p.id); });
+    /* The VCA envelope is not reliably picked up in a fast burst (it needed a nudge on the module), so it is
+       sent again afterwards with wide spacing, and once more later. */
+    var vcaIds = ['vea', 'ved', 'ves', 'ver'], tv = t0 + ordered.length * GAP + 100;
+    [0, 350].forEach(function (extra) {
+      vcaIds.forEach(function (id, k) { sendParam(byId[id], state.values[id], tv + extra + k * 25); });
+    });
+    log('Sent ' + ordered.length + ' values (algorithm and overtone first' + (withFx ? ', FX included' : ', FX not included') + ').');
+    setStatus('Sent ' + ordered.length + ' values' + (withFx ? ' including the global FX.' : '. Global FX were not touched.'), true);
+  });
+
+  /* Panic: stop stuck voices on the selected channel. All sound off / all notes off are standard MIDI
+     messages that the manual does not list, so they may be ignored. The VCA sustain and release are
+     then forced to 0 (listed in the manual's CC chart plus the tested CCs 61 and 12), and note-offs go
+     out for the manual's note range C1-C6 (36-97). Nothing here changes the stored values on the page. */
+  $('panic').addEventListener('click', function () {
+    if (!state.out) { setStatus('No MIDI output selected.', false); return; }
+    var ch = state.chan - 1, t0 = performance.now(), i = 0, n;
+    function cc(c, v) { sendRaw([0xB0 | ch, c, v], t0 + (i++) * GAP); }
+    cc(123, 0); cc(120, 0);
+    cc(61, 0); cc(12, 0);
+    for (n = 36; n <= 97; n++) sendRaw([0x80 | ch, n, 0], t0 + (i++) * GAP);
+    log('Panic on ch ' + state.chan + ': CC 123, CC 120, VCA sustain 0, VCA release 0, note-offs 36-97.');
+    setStatus('Panic sent on channel ' + state.chan + '. VCA sustain and release were forced to 0 on the module. Send all values restores them.', true);
+  });
+
+  $('save').addEventListener('click', function () {
+    var data = { format: 'modfm-programmer', version: 1, created: new Date().toISOString(), values: state.values };
+    var blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    var a = document.createElement('a'), d = new Date();
+    function z(n) { return n < 10 ? '0' + n : '' + n; }
+    a.href = URL.createObjectURL(blob);
+    a.download = 'modfm-patch-' + d.getFullYear() + z(d.getMonth() + 1) + z(d.getDate()) + '-' + z(d.getHours()) + z(d.getMinutes()) + '.json';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+  });
+
+  $('loadBtn').addEventListener('click', function () { $('loadFile').click(); });
+  $('loadFile').addEventListener('change', function (e) {
+    var f = e.target.files && e.target.files[0];
+    if (!f) return;
+    var r = new FileReader();
+    r.onload = function () {
+      try {
+        var d = JSON.parse(r.result);
+        if (!d || d.format !== 'modfm-programmer' || typeof d.values !== 'object' || d.values === null) throw new Error('not a patch file from this page');
+        var n = 0;
+        Object.keys(d.values).forEach(function (id) {
+          var v = d.values[id];
+          if (byId.hasOwnProperty(id) && typeof v === 'number' && isFinite(v)) { setValue(id, v, 'local'); n++; }
+        });
+        clearMarks();
+        setStatus('Loaded ' + n + ' values. Nothing was sent yet. Use "Send all values" to apply them.', true);
+      } catch (err) { setStatus('Could not load that file: ' + err.message, false); }
+      e.target.value = '';
+    };
+    r.readAsText(f);
+  });
+
+  /* Presets are injected by the build step between the markers. Values are plain CC values (0-127). */
+  var PRESETS = /*PRESETS_START*/[
+ {
+  "name": "Hypnotic drone (AL 21)",
+  "values": {
+   "alg": 21,
+   "ovt": 0,
+   "vol": 80,
+   "tune1": 0,
+   "tune2": 12,
+   "tune3": 19,
+   "tune4": 0,
+   "fm41": 56,
+   "fm42": 70,
+   "fm43": 49,
+   "atk1": 20,
+   "dec1": 110,
+   "sus1": 127,
+   "rel1": 90,
+   "vca1": 90,
+   "efm1": 0,
+   "atk2": 20,
+   "dec2": 110,
+   "sus2": 127,
+   "rel2": 90,
+   "vca2": 90,
+   "efm2": 0,
+   "atk3": 0,
+   "dec3": 110,
+   "sus3": 127,
+   "rel3": 60,
+   "vca3": 90,
+   "efm3": 0,
+   "atk4": 0,
+   "dec4": 110,
+   "sus4": 127,
+   "rel4": 60,
+   "vca4": 0,
+   "efm4": 0,
+   "l1mode": 1,
+   "l1mix": 0,
+   "l1oct": 1,
+   "l1rate": 5,
+   "l1wave": 0,
+   "l1fm1": 25,
+   "l1fm2": 25,
+   "l1fm3": 25,
+   "l1fm4": 0,
+   "l2mode": 1,
+   "l2mix": 25,
+   "l2oct": 0,
+   "l2rate": 9,
+   "l2wave": 0,
+   "fcut": 70,
+   "fres": 30,
+   "fshape": 0,
+   "fenv": 35,
+   "fatk": 20,
+   "fdec": 70,
+   "fsus": 70,
+   "frel": 80,
+   "ftk": 60,
+   "ftp24": 127,
+   "fmm12": 0,
+   "fnoise": 0,
+   "fmetal": 0,
+   "flfor": 4,
+   "flfow": 0,
+   "flfoi": 20,
+   "rvsize": 100,
+   "rvlp": 90,
+   "rvhp": 40,
+   "rvlev": 50,
+   "d1time": 70,
+   "d1fb": 60,
+   "d1rng": 1,
+   "d1lev": 40,
+   "d2time": 47,
+   "d2fb": 40,
+   "d2rng": 1,
+   "d2lev": 30,
+   "vea": 0,
+   "ved": 64,
+   "ves": 127,
+   "ver": 90
+  },
+  "note": "Hypnotic drone: AL 21, OP4 modulates carriers at 1:1, 2:1 and 3:1. OP3 has a flat envelope so an Amt 3 lane can hold ratio steps. LFO1 is a VCO used as an FM modulator (mix 0), LFO2 is the audible detuned layer. Assumes the LFO rate CC acts as DET in VCO mode and that waveform 0 is a plain wave, so set both by ear. Includes FX values (tick the FX box to send them). Add the CV lanes from the guide for the long-form motion."
+ },
+ {
+  "name": "Vocal growl (AL 21)",
+  "values": {
+   "alg": 21,
+   "ovt": 0,
+   "vol": 100,
+   "tune1": 19,
+   "tune2": 31,
+   "tune3": 36,
+   "tune4": 0,
+   "fm41": 77,
+   "fm42": 77,
+   "fm43": 63,
+   "atk1": 0,
+   "dec1": 110,
+   "sus1": 127,
+   "rel1": 60,
+   "vca1": 100,
+   "efm1": 0,
+   "atk2": 0,
+   "dec2": 110,
+   "sus2": 127,
+   "rel2": 60,
+   "vca2": 100,
+   "efm2": 0,
+   "atk3": 0,
+   "dec3": 110,
+   "sus3": 127,
+   "rel3": 60,
+   "vca3": 85,
+   "efm3": 0,
+   "atk4": 0,
+   "dec4": 110,
+   "sus4": 127,
+   "rel4": 60,
+   "vca4": 0,
+   "efm4": 0,
+   "l1mode": 0,
+   "l1mix": 0,
+   "l1oct": 0,
+   "l1rate": 18,
+   "l1wave": 0,
+   "l1fm1": 30,
+   "l1fm2": 20,
+   "l1fm3": 12,
+   "l1fm4": 0,
+   "l2mode": 0,
+   "l2mix": 0,
+   "l2oct": 0,
+   "l2rate": 14,
+   "l2wave": 0,
+   "fcut": 64,
+   "fres": 52,
+   "fshape": 64,
+   "fenv": 20,
+   "fatk": 0,
+   "fdec": 60,
+   "fsus": 100,
+   "frel": 40,
+   "ftk": 64,
+   "ftp24": 0,
+   "fmm12": 110,
+   "fnoise": 0,
+   "fmetal": 0,
+   "flfor": 36,
+   "flfow": 0,
+   "flfoi": 90,
+   "rvsize": 60,
+   "rvlp": 100,
+   "rvhp": 30,
+   "rvlev": 25,
+   "d1time": 60,
+   "d1fb": 40,
+   "d1rng": 1,
+   "d1lev": 25,
+   "d2time": 40,
+   "d2fb": 30,
+   "d2rng": 1,
+   "d2lev": 0,
+   "l2am1": 20,
+   "vea": 0,
+   "ved": 64,
+   "ves": 127,
+   "ver": 70
+  },
+  "note": "Vocal growl: AL 21, carriers at 3:1, 6:1 and 8:1 over OP4, so each peaks like a formant. LFO1 sweeps the carriers by different amounts to move the vowel, and the filter is a second band-pass vowel. Assumes filter shape 64 is band-pass. No pitch envelope is used, because the operator envelope is shared with its volume. Includes FX values."
+ },
+ {
+  "name": "FM kick (AL 13)",
+  "values": {
+   "alg": 13,
+   "ovt": 0,
+   "vol": 127,
+   "tune1": 0,
+   "tune2": 12,
+   "tune3": 0,
+   "tune4": 0,
+   "fm21": 60,
+   "fm43": 28,
+   "atk1": 0,
+   "dec1": 26,
+   "sus1": 0,
+   "rel1": 26,
+   "vca1": 115,
+   "efm1": 127,
+   "atk2": 0,
+   "dec2": 12,
+   "sus2": 0,
+   "rel2": 12,
+   "vca2": 0,
+   "efm2": 70,
+   "atk3": 0,
+   "dec3": 105,
+   "sus3": 0,
+   "rel3": 105,
+   "vca3": 127,
+   "efm3": 25,
+   "atk4": 0,
+   "dec4": 64,
+   "sus4": 127,
+   "rel4": 40,
+   "vca4": 0,
+   "efm4": 0,
+   "l1mode": 0,
+   "l1mix": 0,
+   "l2mode": 0,
+   "l2mix": 0,
+   "fcut": 110,
+   "fres": 0,
+   "fshape": 0,
+   "fenv": 0,
+   "fatk": 0,
+   "fdec": 30,
+   "fsus": 0,
+   "frel": 30,
+   "ftk": 0,
+   "ftp24": 127,
+   "fmm12": 0,
+   "fnoise": 0,
+   "fmetal": 0,
+   "flfor": 0,
+   "flfow": 0,
+   "flfoi": 0,
+   "vea": 0,
+   "ved": 95,
+   "ves": 0,
+   "ver": 85
+  },
+  "note": "FM kick: AL 13. OP1 is the punch: a fast, full-depth pitch dive with OP2 adding the click. OP3 is the body: a long sine with a small pitch drop, with a little OP4 modulation for harmonics. The VCA envelope (decay-only, sustain 0) sets the length, so gate length does not matter. Change VCA decay (CC 60) to make it shorter or longer. Play it low. FM sine kicks are light on sub weight compared with an analog kick, so layer or EQ it if you need more. No FX."
+ },
+ {
+  "name": "Serial wub (AL 01)",
+  "values": {
+   "alg": 1,
+   "ovt": 0,
+   "vol": 105,
+   "tune1": 0,
+   "tune2": 0,
+   "tune3": 12,
+   "tune4": 0,
+   "fm21": 98,
+   "fm32": 70,
+   "fm43": 35,
+   "atk1": 0,
+   "dec1": 110,
+   "sus1": 127,
+   "rel1": 60,
+   "vca1": 100,
+   "efm1": 0,
+   "atk2": 0,
+   "dec2": 110,
+   "sus2": 127,
+   "rel2": 60,
+   "vca2": 0,
+   "efm2": 0,
+   "atk3": 0,
+   "dec3": 110,
+   "sus3": 127,
+   "rel3": 60,
+   "vca3": 0,
+   "efm3": 0,
+   "atk4": 0,
+   "dec4": 110,
+   "sus4": 127,
+   "rel4": 60,
+   "vca4": 0,
+   "efm4": 0,
+   "l1mode": 0,
+   "l1mix": 0,
+   "l1oct": 0,
+   "l1rate": 22,
+   "l1wave": 0,
+   "l1fm2": 30,
+   "l1fm3": 25,
+   "l2mode": 0,
+   "l2mix": 0,
+   "fcut": 55,
+   "fres": 50,
+   "fshape": 0,
+   "fenv": 15,
+   "fatk": 0,
+   "fdec": 50,
+   "fsus": 100,
+   "frel": 40,
+   "ftk": 40,
+   "ftp24": 127,
+   "fmm12": 0,
+   "fnoise": 0,
+   "fmetal": 0,
+   "flfor": 30,
+   "flfow": 0,
+   "flfoi": 100,
+   "l2am1": 40,
+   "l2rate": 22,
+   "vea": 0,
+   "ved": 64,
+   "ves": 127,
+   "ver": 70
+  },
+  "note": "Serial FM wub: AL 01 chain with ratios 1:1, 1:1 and 2:1 in OVT 0. LFO1 moves OP2 and OP3 pitch, and the filter LFO does the main wub. LFO rates run free, with no tempo sync. Assumes waveform 0 is smooth. No FX in this preset."
+ },
+ {
+  "name": "Init: single sine",
+  "values": {
+   "alg": 0,
+   "ovt": 0,
+   "vol": 100,
+   "tune1": 0,
+   "tune2": 0,
+   "tune3": 0,
+   "tune4": 0,
+   "atk1": 0,
+   "dec1": 64,
+   "sus1": 127,
+   "rel1": 40,
+   "vca1": 100,
+   "efm1": 0,
+   "atk2": 0,
+   "dec2": 64,
+   "sus2": 127,
+   "rel2": 40,
+   "vca2": 0,
+   "efm2": 0,
+   "atk3": 0,
+   "dec3": 64,
+   "sus3": 127,
+   "rel3": 40,
+   "vca3": 0,
+   "efm3": 0,
+   "atk4": 0,
+   "dec4": 64,
+   "sus4": 127,
+   "rel4": 40,
+   "vca4": 0,
+   "efm4": 0,
+   "l1mode": 0,
+   "l1mix": 0,
+   "l2mode": 0,
+   "l2mix": 0,
+   "fcut": 127,
+   "fres": 0,
+   "fshape": 0,
+   "fenv": 0,
+   "ftk": 0,
+   "ftp24": 127,
+   "fmm12": 0,
+   "fnoise": 0,
+   "fmetal": 0,
+   "flfoi": 0,
+   "vea": 0,
+   "ved": 64,
+   "ves": 127,
+   "ver": 40
+  },
+  "note": "Clean starting point: the free matrix (AL 00) with only OP1 audible, a plain sine at the key pitch. All FM amounts, LFO depths and filter modulation are off and the filter is fully open. Use it to build from scratch or to hear what a single change does. No FX."
+ },
+ {
+  "name": "Metal hat (AL 21)",
+  "values": {
+   "alg": 21,
+   "ovt": 0,
+   "vol": 100,
+   "tune1": 20,
+   "tune2": 28,
+   "tune3": 35,
+   "tune4": 3,
+   "fm41": 98,
+   "fm42": 91,
+   "fm43": 84,
+   "atk1": 0,
+   "dec1": 9,
+   "sus1": 0,
+   "rel1": 9,
+   "vca1": 100,
+   "efm1": 0,
+   "atk2": 0,
+   "dec2": 9,
+   "sus2": 0,
+   "rel2": 9,
+   "vca2": 100,
+   "efm2": 0,
+   "atk3": 0,
+   "dec3": 9,
+   "sus3": 0,
+   "rel3": 9,
+   "vca3": 100,
+   "efm3": 0,
+   "atk4": 0,
+   "dec4": 9,
+   "sus4": 0,
+   "rel4": 9,
+   "vca4": 0,
+   "efm4": 0,
+   "l1mode": 0,
+   "l1mix": 0,
+   "l2mode": 0,
+   "l2mix": 0,
+   "fcut": 80,
+   "fres": 25,
+   "fshape": 127,
+   "fenv": 0,
+   "fatk": 0,
+   "fdec": 30,
+   "fsus": 0,
+   "frel": 30,
+   "ftk": 0,
+   "ftp24": 0,
+   "fmm12": 127,
+   "fnoise": 40,
+   "fmetal": 100,
+   "flfoi": 0,
+   "vea": 0,
+   "ved": 12,
+   "ves": 0,
+   "ver": 8
+  },
+  "note": "Metallic hat: AL 21 with inharmonic carriers (about 2.7:1, 4.2:1 and 6.3:1 over OP4) and heavy FM, short level decays so every hit is the same length, and the multimode filter as a high-pass with some noise. The most speculative preset: it assumes filter shape 127 is high-pass, and the noise-metal scale is a guess, so adjust by ear. VCA envelope: decay-only (sustain 0), so it is a short tick whatever the gate length. Change VCA decay (CC 60) for open or closed hat. No FX."
+ },
+ {
+  "name": "Bell (AL 13, OVT 0)",
+  "values": {
+   "alg": 13,
+   "ovt": 0,
+   "vol": 100,
+   "tune1": 0,
+   "tune2": 6,
+   "tune3": 12,
+   "tune4": 18,
+   "fm12": 0,
+   "fm13": 0,
+   "fm14": 0,
+   "fm21": 84,
+   "fm23": 0,
+   "fm24": 0,
+   "fm31": 0,
+   "fm32": 0,
+   "fm34": 0,
+   "fm41": 0,
+   "fm42": 0,
+   "fm43": 70,
+   "atk1": 0,
+   "dec1": 127,
+   "sus1": 0,
+   "rel1": 127,
+   "vca1": 100,
+   "efm1": 0,
+   "atk2": 0,
+   "dec2": 83,
+   "sus2": 127,
+   "rel2": 52,
+   "vca2": 0,
+   "efm2": 0,
+   "atk3": 0,
+   "dec3": 110,
+   "sus3": 0,
+   "rel3": 110,
+   "vca3": 90,
+   "efm3": 0,
+   "atk4": 0,
+   "dec4": 83,
+   "sus4": 127,
+   "rel4": 52,
+   "vca4": 0,
+   "efm4": 0,
+   "l1mode": 0,
+   "l1mix": 0,
+   "l1oct": 0,
+   "l1rate": 6,
+   "l1wave": 0,
+   "l2mode": 0,
+   "l2mix": 0,
+   "l2oct": 0,
+   "l2rate": 0,
+   "l2wave": 0,
+   "l1fm1": 0,
+   "l2am1": 0,
+   "l1fm2": 0,
+   "l2am2": 0,
+   "l1fm3": 3,
+   "l2am3": 0,
+   "l1fm4": 0,
+   "l2am4": 0,
+   "fcut": 45,
+   "fres": 15,
+   "fshape": 0,
+   "fenv": 90,
+   "fatk": 0,
+   "fdec": 70,
+   "fsus": 0,
+   "frel": 60,
+   "ftk": 80,
+   "ftp24": 127,
+   "fmm12": 0,
+   "fnoise": 0,
+   "fmetal": 0,
+   "flfor": 0,
+   "flfow": 0,
+   "flfoi": 0,
+   "vea": 0,
+   "ved": 64,
+   "ves": 127,
+   "ver": 90
+  },
+  "note": "Tritone-ratio (about 1.41:1) modulators give inharmonic bell partials. Modulator depth is not enveloped, so the filter envelope supplies the bright-to-dark decay. On the module set the VCA envelope to attack 0, decay about 100, sustain 0. No FX."
+ },
+ {
+  "name": "Glass pad (AL 11, OVT 0)",
+  "values": {
+   "alg": 11,
+   "ovt": 0,
+   "vol": 100,
+   "tune1": 0,
+   "tune2": 12,
+   "tune3": 12,
+   "tune4": 19,
+   "fm12": 0,
+   "fm13": 0,
+   "fm14": 0,
+   "fm21": 0,
+   "fm23": 0,
+   "fm24": 0,
+   "fm31": 49,
+   "fm32": 42,
+   "fm34": 0,
+   "fm41": 0,
+   "fm42": 0,
+   "fm43": 42,
+   "atk1": 90,
+   "dec1": 110,
+   "sus1": 127,
+   "rel1": 100,
+   "vca1": 100,
+   "efm1": 0,
+   "atk2": 90,
+   "dec2": 110,
+   "sus2": 127,
+   "rel2": 100,
+   "vca2": 90,
+   "efm2": 0,
+   "atk3": 0,
+   "dec3": 110,
+   "sus3": 127,
+   "rel3": 60,
+   "vca3": 0,
+   "efm3": 0,
+   "atk4": 0,
+   "dec4": 110,
+   "sus4": 127,
+   "rel4": 60,
+   "vca4": 0,
+   "efm4": 0,
+   "l1mode": 0,
+   "l1mix": 0,
+   "l1oct": 0,
+   "l1rate": 10,
+   "l1wave": 0,
+   "l2mode": 0,
+   "l2mix": 0,
+   "l2oct": 0,
+   "l2rate": 8,
+   "l2wave": 0,
+   "l1fm1": 6,
+   "l2am1": 18,
+   "l1fm2": 8,
+   "l2am2": 0,
+   "l1fm3": 0,
+   "l2am3": 0,
+   "l1fm4": 0,
+   "l2am4": 0,
+   "fcut": 85,
+   "fres": 10,
+   "fshape": 0,
+   "fenv": 25,
+   "fatk": 70,
+   "fdec": 80,
+   "fsus": 100,
+   "frel": 90,
+   "ftk": 60,
+   "ftp24": 127,
+   "fmm12": 0,
+   "fnoise": 0,
+   "fmetal": 0,
+   "flfor": 6,
+   "flfow": 0,
+   "flfoi": 15,
+   "vea": 0,
+   "ved": 64,
+   "ves": 127,
+   "ver": 90
+  },
+  "note": "Slow pad: M4 feeds M3, which feeds two carriers an octave apart. LFO1 drifts the carrier pitches very slowly and the filter LFO adds slow movement. VCA envelope: attack about 90, sustain high, long release. No FX."
+ },
+ {
+  "name": "E-piano (AL 13, OVT 0)",
+  "values": {
+   "alg": 13,
+   "ovt": 0,
+   "vol": 100,
+   "tune1": 0,
+   "tune2": 0,
+   "tune3": 0,
+   "tune4": 46,
+   "fm12": 0,
+   "fm13": 0,
+   "fm14": 0,
+   "fm21": 42,
+   "fm23": 0,
+   "fm24": 0,
+   "fm31": 0,
+   "fm32": 0,
+   "fm34": 0,
+   "fm41": 0,
+   "fm42": 0,
+   "fm43": 63,
+   "atk1": 0,
+   "dec1": 117,
+   "sus1": 15,
+   "rel1": 78,
+   "vca1": 100,
+   "efm1": 0,
+   "atk2": 0,
+   "dec2": 83,
+   "sus2": 127,
+   "rel2": 52,
+   "vca2": 0,
+   "efm2": 0,
+   "atk3": 0,
+   "dec3": 39,
+   "sus3": 0,
+   "rel3": 39,
+   "vca3": 55,
+   "efm3": 0,
+   "atk4": 0,
+   "dec4": 83,
+   "sus4": 127,
+   "rel4": 52,
+   "vca4": 0,
+   "efm4": 0,
+   "l1mode": 0,
+   "l1mix": 0,
+   "l1oct": 0,
+   "l1rate": 0,
+   "l1wave": 0,
+   "l2mode": 0,
+   "l2mix": 0,
+   "l2oct": 0,
+   "l2rate": 0,
+   "l2wave": 0,
+   "l1fm1": 0,
+   "l2am1": 0,
+   "l1fm2": 0,
+   "l2am2": 0,
+   "l1fm3": 0,
+   "l2am3": 0,
+   "l1fm4": 0,
+   "l2am4": 0,
+   "fcut": 100,
+   "fres": 0,
+   "fshape": 0,
+   "fenv": 20,
+   "fatk": 0,
+   "fdec": 50,
+   "fsus": 0,
+   "frel": 40,
+   "ftk": 50,
+   "ftp24": 127,
+   "fmm12": 0,
+   "fnoise": 0,
+   "fmetal": 0,
+   "flfor": 0,
+   "flfow": 0,
+   "flfoi": 0,
+   "vea": 0,
+   "ved": 64,
+   "ves": 127,
+   "ver": 60
+  },
+  "note": "Two pairs: a 1:1 body pair that rings, and a short tine pair with the modulator at about 14:1 (46 semitones) for the click. VCA envelope: attack 0, decay about 90, sustain low. No FX."
+ },
+ {
+  "name": "Mallet (AL 13, OVT 0)",
+  "values": {
+   "alg": 13,
+   "ovt": 0,
+   "vol": 100,
+   "tune1": 0,
+   "tune2": 22,
+   "tune3": 12,
+   "tune4": 12,
+   "fm12": 0,
+   "fm13": 0,
+   "fm14": 0,
+   "fm21": 63,
+   "fm23": 0,
+   "fm24": 0,
+   "fm31": 0,
+   "fm32": 0,
+   "fm34": 0,
+   "fm41": 0,
+   "fm42": 0,
+   "fm43": 28,
+   "atk1": 0,
+   "dec1": 72,
+   "sus1": 0,
+   "rel1": 65,
+   "vca1": 100,
+   "efm1": 0,
+   "atk2": 0,
+   "dec2": 83,
+   "sus2": 127,
+   "rel2": 52,
+   "vca2": 0,
+   "efm2": 0,
+   "atk3": 0,
+   "dec3": 52,
+   "sus3": 0,
+   "rel3": 46,
+   "vca3": 60,
+   "efm3": 0,
+   "atk4": 0,
+   "dec4": 83,
+   "sus4": 127,
+   "rel4": 52,
+   "vca4": 0,
+   "efm4": 0,
+   "l1mode": 0,
+   "l1mix": 0,
+   "l1oct": 0,
+   "l1rate": 0,
+   "l1wave": 0,
+   "l2mode": 0,
+   "l2mix": 0,
+   "l2oct": 0,
+   "l2rate": 0,
+   "l2wave": 0,
+   "l1fm1": 0,
+   "l2am1": 0,
+   "l1fm2": 0,
+   "l2am2": 0,
+   "l1fm3": 0,
+   "l2am3": 0,
+   "l1fm4": 0,
+   "l2am4": 0,
+   "fcut": 90,
+   "fres": 0,
+   "fshape": 0,
+   "fenv": 30,
+   "fatk": 0,
+   "fdec": 40,
+   "fsus": 0,
+   "frel": 40,
+   "ftk": 40,
+   "ftp24": 127,
+   "fmm12": 0,
+   "fnoise": 0,
+   "fmetal": 0,
+   "flfor": 0,
+   "flfow": 0,
+   "flfoi": 0,
+   "vea": 0,
+   "ved": 64,
+   "ves": 127,
+   "ver": 60
+  },
+  "note": "Wooden mallet: about 3.4:1 modulator on the main pair, with an octave pair underneath for body. Short decays. VCA envelope: attack 0, decay about 55, sustain 0. No FX."
+ },
+ {
+  "name": "Sub bass (AL 01, OVT 0)",
+  "values": {
+   "alg": 1,
+   "ovt": 0,
+   "vol": 100,
+   "tune1": 0,
+   "tune2": 0,
+   "tune3": 0,
+   "tune4": 12,
+   "fm12": 0,
+   "fm13": 0,
+   "fm14": 0,
+   "fm21": 21,
+   "fm23": 0,
+   "fm24": 0,
+   "fm31": 0,
+   "fm32": 0,
+   "fm34": 0,
+   "fm41": 0,
+   "fm42": 0,
+   "fm43": 0,
+   "atk1": 0,
+   "dec1": 0,
+   "sus1": 127,
+   "rel1": 25,
+   "vca1": 110,
+   "efm1": 0,
+   "atk2": 0,
+   "dec2": 64,
+   "sus2": 127,
+   "rel2": 40,
+   "vca2": 0,
+   "efm2": 0,
+   "atk3": 0,
+   "dec3": 64,
+   "sus3": 127,
+   "rel3": 40,
+   "vca3": 0,
+   "efm3": 0,
+   "atk4": 0,
+   "dec4": 64,
+   "sus4": 127,
+   "rel4": 40,
+   "vca4": 0,
+   "efm4": 0,
+   "l1mode": 0,
+   "l1mix": 0,
+   "l1oct": 0,
+   "l1rate": 0,
+   "l1wave": 0,
+   "l2mode": 0,
+   "l2mix": 0,
+   "l2oct": 0,
+   "l2rate": 0,
+   "l2wave": 0,
+   "l1fm1": 0,
+   "l2am1": 0,
+   "l1fm2": 0,
+   "l2am2": 0,
+   "l1fm3": 0,
+   "l2am3": 0,
+   "l1fm4": 0,
+   "l2am4": 0,
+   "fcut": 60,
+   "fres": 0,
+   "fshape": 0,
+   "fenv": 0,
+   "fatk": 0,
+   "fdec": 64,
+   "fsus": 127,
+   "frel": 40,
+   "ftk": 64,
+   "ftp24": 127,
+   "fmm12": 0,
+   "fnoise": 0,
+   "fmetal": 0,
+   "flfor": 0,
+   "flfow": 0,
+   "flfoi": 0,
+   "vea": 0,
+   "ved": 64,
+   "ves": 127,
+   "ver": 40
+  },
+  "note": "Nearly pure sine from the serial chain with just a little modulation from OP2. Add depth with the FM 2>1 amount. VCA envelope: attack 0, sustain max, short release. No FX."
+ },
+ {
+  "name": "Acid squelch (AL 01, OVT 0)",
+  "values": {
+   "alg": 1,
+   "ovt": 0,
+   "vol": 105,
+   "tune1": 0,
+   "tune2": 0,
+   "tune3": 12,
+   "tune4": 0,
+   "fm12": 0,
+   "fm13": 0,
+   "fm14": 0,
+   "fm21": 77,
+   "fm23": 0,
+   "fm24": 0,
+   "fm31": 0,
+   "fm32": 42,
+   "fm34": 0,
+   "fm41": 0,
+   "fm42": 0,
+   "fm43": 21,
+   "atk1": 0,
+   "dec1": 110,
+   "sus1": 127,
+   "rel1": 60,
+   "vca1": 105,
+   "efm1": 0,
+   "atk2": 0,
+   "dec2": 90,
+   "sus2": 127,
+   "rel2": 60,
+   "vca2": 0,
+   "efm2": 0,
+   "atk3": 0,
+   "dec3": 90,
+   "sus3": 127,
+   "rel3": 60,
+   "vca3": 0,
+   "efm3": 0,
+   "atk4": 0,
+   "dec4": 90,
+   "sus4": 127,
+   "rel4": 60,
+   "vca4": 0,
+   "efm4": 0,
+   "l1mode": 0,
+   "l1mix": 0,
+   "l1oct": 0,
+   "l1rate": 30,
+   "l1wave": 0,
+   "l2mode": 0,
+   "l2mix": 0,
+   "l2oct": 0,
+   "l2rate": 0,
+   "l2wave": 0,
+   "l1fm1": 0,
+   "l2am1": 0,
+   "l1fm2": 8,
+   "l2am2": 0,
+   "l1fm3": 0,
+   "l2am3": 0,
+   "l1fm4": 0,
+   "l2am4": 0,
+   "fcut": 40,
+   "fres": 55,
+   "fshape": 0,
+   "fenv": 100,
+   "fatk": 0,
+   "fdec": 45,
+   "fsus": 0,
+   "frel": 30,
+   "ftk": 40,
+   "ftp24": 127,
+   "fmm12": 0,
+   "fnoise": 0,
+   "fmetal": 0,
+   "flfor": 0,
+   "flfow": 0,
+   "flfoi": 0,
+   "vea": 0,
+   "ved": 64,
+   "ves": 127,
+   "ver": 70
+  },
+  "note": "Serial FM through a resonant filter with a strong, short filter envelope. Slightly overdriven (VOL 105). VCA envelope: attack 0, sustain high, short release. No FX."
+ },
+ {
+  "name": "Snare (AL 21, OVT 0)",
+  "values": {
+   "alg": 21,
+   "ovt": 0,
+   "vol": 100,
+   "tune1": 7,
+   "tune2": 15,
+   "tune3": 26,
+   "tune4": 4,
+   "fm12": 0,
+   "fm13": 0,
+   "fm14": 0,
+   "fm21": 0,
+   "fm23": 0,
+   "fm24": 0,
+   "fm31": 0,
+   "fm32": 0,
+   "fm34": 0,
+   "fm41": 84,
+   "fm42": 84,
+   "fm43": 70,
+   "atk1": 0,
+   "dec1": 20,
+   "sus1": 0,
+   "rel1": 20,
+   "vca1": 100,
+   "efm1": 0,
+   "atk2": 0,
+   "dec2": 20,
+   "sus2": 0,
+   "rel2": 20,
+   "vca2": 90,
+   "efm2": 0,
+   "atk3": 0,
+   "dec3": 20,
+   "sus3": 0,
+   "rel3": 20,
+   "vca3": 80,
+   "efm3": 0,
+   "atk4": 0,
+   "dec4": 20,
+   "sus4": 0,
+   "rel4": 20,
+   "vca4": 0,
+   "efm4": 0,
+   "l1mode": 0,
+   "l1mix": 0,
+   "l1oct": 0,
+   "l1rate": 0,
+   "l1wave": 0,
+   "l2mode": 0,
+   "l2mix": 0,
+   "l2oct": 0,
+   "l2rate": 0,
+   "l2wave": 0,
+   "l1fm1": 0,
+   "l2am1": 0,
+   "l1fm2": 0,
+   "l2am2": 0,
+   "l1fm3": 0,
+   "l2am3": 0,
+   "l1fm4": 0,
+   "l2am4": 0,
+   "fcut": 75,
+   "fres": 20,
+   "fshape": 64,
+   "fenv": 0,
+   "fatk": 0,
+   "fdec": 64,
+   "fsus": 127,
+   "frel": 40,
+   "ftk": 0,
+   "ftp24": 0,
+   "fmm12": 127,
+   "fnoise": 80,
+   "fmetal": 40,
+   "flfor": 0,
+   "flfow": 0,
+   "flfoi": 0,
+   "vea": 0,
+   "ved": 30,
+   "ves": 0,
+   "ver": 20
+  },
+  "note": "Inharmonic carriers over OP4 with heavy FM, plus noise through a band-pass filter. VCA envelope: attack 0, decay about 38, sustain 0, release about 38. No FX. VCA envelope: decay-only, so gate length does not matter. Change VCA decay (CC 60) for a longer or tighter hit."
+ },
+ {
+  "name": "Tom (AL 13, OVT 0)",
+  "values": {
+   "alg": 13,
+   "ovt": 0,
+   "vol": 100,
+   "tune1": 12,
+   "tune2": 24,
+   "tune3": 12,
+   "tune4": 12,
+   "fm12": 0,
+   "fm13": 0,
+   "fm14": 0,
+   "fm21": 17,
+   "fm23": 0,
+   "fm24": 0,
+   "fm31": 0,
+   "fm32": 0,
+   "fm34": 0,
+   "fm41": 0,
+   "fm42": 0,
+   "fm43": 0,
+   "atk1": 0,
+   "dec1": 42,
+   "sus1": 0,
+   "rel1": 42,
+   "vca1": 90,
+   "efm1": 55,
+   "atk2": 0,
+   "dec2": 24,
+   "sus2": 0,
+   "rel2": 24,
+   "vca2": 0,
+   "efm2": 20,
+   "atk3": 0,
+   "dec3": 84,
+   "sus3": 0,
+   "rel3": 84,
+   "vca3": 100,
+   "efm3": 0,
+   "atk4": 0,
+   "dec4": 77,
+   "sus4": 127,
+   "rel4": 48,
+   "vca4": 0,
+   "efm4": 0,
+   "l1mode": 0,
+   "l1mix": 0,
+   "l1oct": 0,
+   "l1rate": 0,
+   "l1wave": 0,
+   "l2mode": 0,
+   "l2mix": 0,
+   "l2oct": 0,
+   "l2rate": 0,
+   "l2wave": 0,
+   "l1fm1": 0,
+   "l2am1": 0,
+   "l1fm2": 0,
+   "l2am2": 0,
+   "l1fm3": 0,
+   "l2am3": 0,
+   "l1fm4": 0,
+   "l2am4": 0,
+   "fcut": 100,
+   "fres": 0,
+   "fshape": 0,
+   "fenv": 15,
+   "fatk": 0,
+   "fdec": 40,
+   "fsus": 0,
+   "frel": 40,
+   "ftk": 0,
+   "ftp24": 127,
+   "fmm12": 0,
+   "fnoise": 0,
+   "fmetal": 0,
+   "flfor": 0,
+   "flfow": 0,
+   "flfoi": 0,
+   "vea": 0,
+   "ved": 70,
+   "ves": 0,
+   "ver": 55
+  },
+  "note": "OP1 is a short pitch dive, OP3 the steady body, OP2 adds a little click. Raise OP1's pitch amount for a bigger drop. VCA envelope: attack 0, decay about 70, sustain 0. No FX."
+ },
+ {
+  "name": "Laser zap (AL 03, OVT 0)",
+  "values": {
+   "alg": 3,
+   "ovt": 0,
+   "vol": 100,
+   "tune1": 12,
+   "tune2": 7,
+   "tune3": 19,
+   "tune4": 12,
+   "fm12": 0,
+   "fm13": 0,
+   "fm14": 0,
+   "fm21": 77,
+   "fm23": 0,
+   "fm24": 0,
+   "fm31": 0,
+   "fm32": 63,
+   "fm34": 0,
+   "fm41": 0,
+   "fm42": 56,
+   "fm43": 0,
+   "atk1": 0,
+   "dec1": 78,
+   "sus1": 0,
+   "rel1": 72,
+   "vca1": 100,
+   "efm1": 70,
+   "atk2": 0,
+   "dec2": 36,
+   "sus2": 0,
+   "rel2": 36,
+   "vca2": 0,
+   "efm2": 100,
+   "atk3": 0,
+   "dec3": 36,
+   "sus3": 0,
+   "rel3": 36,
+   "vca3": 0,
+   "efm3": 80,
+   "atk4": 0,
+   "dec4": 36,
+   "sus4": 0,
+   "rel4": 36,
+   "vca4": 0,
+   "efm4": 60,
+   "l1mode": 0,
+   "l1mix": 0,
+   "l1oct": 0,
+   "l1rate": 0,
+   "l1wave": 0,
+   "l2mode": 0,
+   "l2mix": 0,
+   "l2oct": 0,
+   "l2rate": 0,
+   "l2wave": 0,
+   "l1fm1": 0,
+   "l2am1": 0,
+   "l1fm2": 0,
+   "l2am2": 0,
+   "l1fm3": 0,
+   "l2am3": 0,
+   "l1fm4": 0,
+   "l2am4": 0,
+   "fcut": 100,
+   "fres": 0,
+   "fshape": 0,
+   "fenv": 0,
+   "fatk": 0,
+   "fdec": 64,
+   "fsus": 127,
+   "frel": 40,
+   "ftk": 0,
+   "ftp24": 127,
+   "fmm12": 0,
+   "fnoise": 0,
+   "fmetal": 0,
+   "flfor": 0,
+   "flfow": 0,
+   "flfoi": 0,
+   "vea": 0,
+   "ved": 64,
+   "ves": 127,
+   "ver": 60
+  },
+  "note": "Fast pitch envelopes on the carrier and both modulator stages make the sidebands sweep down. VCA envelope: attack 0, decay about 60, sustain 0. No FX."
+ },
+ {
+  "name": "Harmonic lead (AL 17, OVT 1)",
+  "values": {
+   "alg": 17,
+   "ovt": 1,
+   "vol": 100,
+   "tune1": 0,
+   "tune2": 8,
+   "tune3": 16,
+   "tune4": 24,
+   "fm12": 0,
+   "fm13": 0,
+   "fm14": 0,
+   "fm21": 35,
+   "fm23": 0,
+   "fm24": 0,
+   "fm31": 28,
+   "fm32": 0,
+   "fm34": 0,
+   "fm41": 21,
+   "fm42": 0,
+   "fm43": 0,
+   "atk1": 5,
+   "dec1": 110,
+   "sus1": 127,
+   "rel1": 60,
+   "vca1": 105,
+   "efm1": 0,
+   "atk2": 0,
+   "dec2": 110,
+   "sus2": 127,
+   "rel2": 60,
+   "vca2": 0,
+   "efm2": 0,
+   "atk3": 0,
+   "dec3": 110,
+   "sus3": 127,
+   "rel3": 60,
+   "vca3": 0,
+   "efm3": 0,
+   "atk4": 0,
+   "dec4": 110,
+   "sus4": 127,
+   "rel4": 60,
+   "vca4": 0,
+   "efm4": 0,
+   "l1mode": 0,
+   "l1mix": 0,
+   "l1oct": 0,
+   "l1rate": 55,
+   "l1wave": 0,
+   "l2mode": 0,
+   "l2mix": 0,
+   "l2oct": 0,
+   "l2rate": 0,
+   "l2wave": 0,
+   "l1fm1": 8,
+   "l2am1": 0,
+   "l1fm2": 0,
+   "l2am2": 0,
+   "l1fm3": 0,
+   "l2am3": 0,
+   "l1fm4": 0,
+   "l2am4": 0,
+   "fcut": 95,
+   "fres": 10,
+   "fshape": 0,
+   "fenv": 15,
+   "fatk": 0,
+   "fdec": 64,
+   "fsus": 127,
+   "frel": 40,
+   "ftk": 64,
+   "ftp24": 127,
+   "fmm12": 0,
+   "fnoise": 0,
+   "fmetal": 0,
+   "flfor": 0,
+   "flfow": 0,
+   "flfoi": 0,
+   "vea": 0,
+   "ved": 64,
+   "ves": 127,
+   "ver": 70
+  },
+  "note": "Three modulators on one carrier, all locked to harmonics of OP1, with gentle LFO vibrato. Carrier envelope: sustain full, decay 110, so it holds while the key is down. VCA envelope: attack 5, sustain high, short release. In OVT 1 the locked operators' knobs pick harmonics. The manual doesn't give the number mapping, so nudge them by ear. No FX."
+ },
+ {
+  "name": "Brass (AL 01, OVT 1)",
+  "values": {
+   "alg": 1,
+   "ovt": 1,
+   "vol": 100,
+   "tune1": 0,
+   "tune2": 4,
+   "tune3": 4,
+   "tune4": 8,
+   "fm12": 0,
+   "fm13": 0,
+   "fm14": 0,
+   "fm21": 70,
+   "fm23": 0,
+   "fm24": 0,
+   "fm31": 0,
+   "fm32": 49,
+   "fm34": 0,
+   "fm41": 0,
+   "fm42": 0,
+   "fm43": 35,
+   "atk1": 15,
+   "dec1": 110,
+   "sus1": 127,
+   "rel1": 60,
+   "vca1": 105,
+   "efm1": 0,
+   "atk2": 0,
+   "dec2": 110,
+   "sus2": 127,
+   "rel2": 60,
+   "vca2": 0,
+   "efm2": 0,
+   "atk3": 0,
+   "dec3": 110,
+   "sus3": 127,
+   "rel3": 60,
+   "vca3": 0,
+   "efm3": 0,
+   "atk4": 0,
+   "dec4": 110,
+   "sus4": 127,
+   "rel4": 60,
+   "vca4": 0,
+   "efm4": 0,
+   "l1mode": 0,
+   "l1mix": 0,
+   "l1oct": 0,
+   "l1rate": 20,
+   "l1wave": 0,
+   "l2mode": 0,
+   "l2mix": 0,
+   "l2oct": 0,
+   "l2rate": 0,
+   "l2wave": 0,
+   "l1fm1": 0,
+   "l2am1": 0,
+   "l1fm2": 12,
+   "l2am2": 0,
+   "l1fm3": 0,
+   "l2am3": 0,
+   "l1fm4": 0,
+   "l2am4": 0,
+   "fcut": 45,
+   "fres": 20,
+   "fshape": 0,
+   "fenv": 75,
+   "fatk": 25,
+   "fdec": 60,
+   "fsus": 70,
+   "frel": 40,
+   "ftk": 60,
+   "ftp24": 127,
+   "fmm12": 0,
+   "fnoise": 0,
+   "fmetal": 0,
+   "flfor": 0,
+   "flfow": 0,
+   "flfoi": 0,
+   "vea": 0,
+   "ved": 64,
+   "ves": 127,
+   "ver": 70
+  },
+  "note": "Serial FM with a slow filter swell for the brass attack. VCA envelope: attack about 15, sustain high, short release. In OVT 1 the locked operators' knobs pick harmonics. The manual doesn't give the number mapping, so nudge them by ear. No FX."
+ },
+ {
+  "name": "Clav (AL 05, OVT 1)",
+  "values": {
+   "alg": 5,
+   "ovt": 1,
+   "vol": 100,
+   "tune1": 0,
+   "tune2": 4,
+   "tune3": 12,
+   "tune4": 8,
+   "fm12": 0,
+   "fm13": 0,
+   "fm14": 0,
+   "fm21": 56,
+   "fm23": 0,
+   "fm24": 0,
+   "fm31": 0,
+   "fm32": 42,
+   "fm34": 0,
+   "fm41": 49,
+   "fm42": 0,
+   "fm43": 0,
+   "atk1": 0,
+   "dec1": 95,
+   "sus1": 70,
+   "rel1": 70,
+   "vca1": 105,
+   "efm1": 0,
+   "atk2": 0,
+   "dec2": 95,
+   "sus2": 127,
+   "rel2": 70,
+   "vca2": 0,
+   "efm2": 0,
+   "atk3": 0,
+   "dec3": 95,
+   "sus3": 127,
+   "rel3": 70,
+   "vca3": 0,
+   "efm3": 0,
+   "atk4": 0,
+   "dec4": 95,
+   "sus4": 127,
+   "rel4": 70,
+   "vca4": 0,
+   "efm4": 0,
+   "l1mode": 0,
+   "l1mix": 0,
+   "l1oct": 0,
+   "l1rate": 0,
+   "l1wave": 0,
+   "l2mode": 0,
+   "l2mix": 0,
+   "l2oct": 0,
+   "l2rate": 0,
+   "l2wave": 0,
+   "l1fm1": 0,
+   "l2am1": 0,
+   "l1fm2": 0,
+   "l2am2": 0,
+   "l1fm3": 0,
+   "l2am3": 0,
+   "l1fm4": 0,
+   "l2am4": 0,
+   "fcut": 70,
+   "fres": 30,
+   "fshape": 0,
+   "fenv": 50,
+   "fatk": 0,
+   "fdec": 35,
+   "fsus": 10,
+   "frel": 40,
+   "ftk": 50,
+   "ftp24": 127,
+   "fmm12": 0,
+   "fnoise": 0,
+   "fmetal": 0,
+   "flfor": 0,
+   "flfow": 0,
+   "flfoi": 0,
+   "vea": 0,
+   "ved": 64,
+   "ves": 127,
+   "ver": 80
+  },
+  "note": "Short, plucky clavinet: M3 into M2 into the carrier, with M4 also hitting the carrier. VCA envelope: attack 0, decay about 45, sustain low. In OVT 1 the locked operators' knobs pick harmonics. The manual doesn't give the number mapping, so nudge them by ear. No FX."
+ },
+ {
+  "name": "Choir drone (AL 03, OVT 1)",
+  "values": {
+   "alg": 3,
+   "ovt": 1,
+   "vol": 100,
+   "tune1": 0,
+   "tune2": 24,
+   "tune3": 40,
+   "tune4": 56,
+   "fm12": 0,
+   "fm13": 0,
+   "fm14": 0,
+   "fm21": 42,
+   "fm23": 0,
+   "fm24": 0,
+   "fm31": 0,
+   "fm32": 28,
+   "fm34": 0,
+   "fm41": 0,
+   "fm42": 28,
+   "fm43": 0,
+   "atk1": 100,
+   "dec1": 110,
+   "sus1": 127,
+   "rel1": 110,
+   "vca1": 100,
+   "efm1": 0,
+   "atk2": 0,
+   "dec2": 110,
+   "sus2": 127,
+   "rel2": 60,
+   "vca2": 0,
+   "efm2": 0,
+   "atk3": 0,
+   "dec3": 110,
+   "sus3": 127,
+   "rel3": 60,
+   "vca3": 0,
+   "efm3": 0,
+   "atk4": 0,
+   "dec4": 110,
+   "sus4": 127,
+   "rel4": 60,
+   "vca4": 0,
+   "efm4": 0,
+   "l1mode": 0,
+   "l1mix": 0,
+   "l1oct": 0,
+   "l1rate": 8,
+   "l1wave": 0,
+   "l2mode": 0,
+   "l2mix": 0,
+   "l2oct": 0,
+   "l2rate": 12,
+   "l2wave": 0,
+   "l1fm1": 5,
+   "l2am1": 35,
+   "l1fm2": 0,
+   "l2am2": 0,
+   "l1fm3": 0,
+   "l2am3": 0,
+   "l1fm4": 0,
+   "l2am4": 0,
+   "fcut": 80,
+   "fres": 15,
+   "fshape": 0,
+   "fenv": 0,
+   "fatk": 0,
+   "fdec": 64,
+   "fsus": 127,
+   "frel": 40,
+   "ftk": 0,
+   "ftp24": 127,
+   "fmm12": 0,
+   "fnoise": 0,
+   "fmetal": 0,
+   "flfor": 5,
+   "flfow": 0,
+   "flfoi": 20,
+   "vea": 0,
+   "ved": 64,
+   "ves": 127,
+   "ver": 90
+  },
+  "note": "Slow, breathing drone with high harmonics (high knob values) and LFO2 amplitude movement. If it is too bright, lower OP3 and OP4. VCA envelope: slow attack, sustain high, long release. In OVT 1 the locked operators' knobs pick harmonics. The manual doesn't give the number mapping, so nudge them by ear. No FX."
+ },
+ {
+  "name": "Saw-like lead (AL 07, OVT 1)",
+  "values": {
+   "alg": 7,
+   "ovt": 1,
+   "vol": 100,
+   "tune1": 0,
+   "tune2": 0,
+   "tune3": 8,
+   "tune4": 16,
+   "fm12": 0,
+   "fm13": 0,
+   "fm14": 0,
+   "fm21": 72,
+   "fm23": 0,
+   "fm24": 0,
+   "fm31": 64,
+   "fm32": 0,
+   "fm34": 0,
+   "fm41": 0,
+   "fm42": 0,
+   "fm43": 28,
+   "atk1": 5,
+   "dec1": 110,
+   "sus1": 127,
+   "rel1": 60,
+   "vca1": 105,
+   "efm1": 0,
+   "atk2": 0,
+   "dec2": 110,
+   "sus2": 127,
+   "rel2": 60,
+   "vca2": 0,
+   "efm2": 0,
+   "atk3": 0,
+   "dec3": 110,
+   "sus3": 127,
+   "rel3": 60,
+   "vca3": 0,
+   "efm3": 0,
+   "atk4": 0,
+   "dec4": 110,
+   "sus4": 127,
+   "rel4": 60,
+   "vca4": 0,
+   "efm4": 0,
+   "l1mode": 0,
+   "l1mix": 0,
+   "l1oct": 0,
+   "l1rate": 50,
+   "l1wave": 0,
+   "l2mode": 0,
+   "l2mix": 0,
+   "l2oct": 0,
+   "l2rate": 0,
+   "l2wave": 0,
+   "l1fm1": 6,
+   "l2am1": 0,
+   "l1fm2": 0,
+   "l2am2": 0,
+   "l1fm3": 0,
+   "l2am3": 0,
+   "l1fm4": 0,
+   "l2am4": 0,
+   "fcut": 85,
+   "fres": 25,
+   "fshape": 0,
+   "fenv": 30,
+   "fatk": 0,
+   "fdec": 40,
+   "fsus": 80,
+   "frel": 40,
+   "ftk": 64,
+   "ftp24": 127,
+   "fmm12": 0,
+   "fnoise": 0,
+   "fmetal": 0,
+   "flfor": 0,
+   "flfow": 0,
+   "flfoi": 0,
+   "vea": 0,
+   "ved": 64,
+   "ves": 127,
+   "ver": 80
+  },
+  "note": "A modulator at 1:1 gives a saw-like spectrum; the second modulator, fed by OP4, adds upper harmonics. VCA envelope: attack 5, sustain high, short release. In OVT 1 the locked operators' knobs pick harmonics. The manual doesn't give the number mapping, so nudge them by ear. No FX."
+ },
+ {
+  "name": "Twin pad (AL 13, OVT 2)",
+  "values": {
+   "alg": 13,
+   "ovt": 2,
+   "vol": 100,
+   "tune1": 0,
+   "tune2": 8,
+   "tune3": 7,
+   "tune4": 8,
+   "fm12": 0,
+   "fm13": 0,
+   "fm14": 0,
+   "fm21": 35,
+   "fm23": 0,
+   "fm24": 0,
+   "fm31": 0,
+   "fm32": 0,
+   "fm34": 0,
+   "fm41": 0,
+   "fm42": 0,
+   "fm43": 35,
+   "atk1": 85,
+   "dec1": 110,
+   "sus1": 127,
+   "rel1": 100,
+   "vca1": 100,
+   "efm1": 0,
+   "atk2": 0,
+   "dec2": 110,
+   "sus2": 127,
+   "rel2": 60,
+   "vca2": 0,
+   "efm2": 0,
+   "atk3": 85,
+   "dec3": 110,
+   "sus3": 127,
+   "rel3": 100,
+   "vca3": 95,
+   "efm3": 0,
+   "atk4": 0,
+   "dec4": 110,
+   "sus4": 127,
+   "rel4": 60,
+   "vca4": 0,
+   "efm4": 0,
+   "l1mode": 0,
+   "l1mix": 0,
+   "l1oct": 0,
+   "l1rate": 9,
+   "l1wave": 0,
+   "l2mode": 0,
+   "l2mix": 0,
+   "l2oct": 0,
+   "l2rate": 10,
+   "l2wave": 0,
+   "l1fm1": 5,
+   "l2am1": 15,
+   "l1fm2": 0,
+   "l2am2": 0,
+   "l1fm3": 7,
+   "l2am3": 15,
+   "l1fm4": 0,
+   "l2am4": 0,
+   "fcut": 90,
+   "fres": 10,
+   "fshape": 0,
+   "fenv": 20,
+   "fatk": 60,
+   "fdec": 64,
+   "fsus": 127,
+   "frel": 40,
+   "ftk": 50,
+   "ftp24": 127,
+   "fmm12": 0,
+   "fnoise": 0,
+   "fmetal": 0,
+   "flfor": 0,
+   "flfow": 0,
+   "flfoi": 0,
+   "vea": 0,
+   "ved": 64,
+   "ves": 127,
+   "ver": 90
+  },
+  "note": "Two locked pairs: bases at 0 and 7 semitones (a fifth apart), each with its own harmonic modulator. LFO1 drifts the two bases against each other. VCA envelope: slow attack, sustain high, long release. In OVT 2 the locked operators' knobs pick harmonics. The manual doesn't give the number mapping, so nudge them by ear. No FX."
+ },
+ {
+  "name": "Octave bells (AL 14, OVT 2)",
+  "values": {
+   "alg": 14,
+   "ovt": 2,
+   "vol": 100,
+   "tune1": 0,
+   "tune2": 16,
+   "tune3": 12,
+   "tune4": 24,
+   "fm12": 0,
+   "fm13": 0,
+   "fm14": 0,
+   "fm21": 77,
+   "fm23": 0,
+   "fm24": 0,
+   "fm31": 0,
+   "fm32": 0,
+   "fm34": 0,
+   "fm41": 0,
+   "fm42": 0,
+   "fm43": 63,
+   "atk1": 0,
+   "dec1": 124,
+   "sus1": 0,
+   "rel1": 117,
+   "vca1": 100,
+   "efm1": 0,
+   "atk2": 0,
+   "dec2": 83,
+   "sus2": 127,
+   "rel2": 52,
+   "vca2": 0,
+   "efm2": 0,
+   "atk3": 0,
+   "dec3": 124,
+   "sus3": 0,
+   "rel3": 117,
+   "vca3": 90,
+   "efm3": 0,
+   "atk4": 0,
+   "dec4": 83,
+   "sus4": 127,
+   "rel4": 52,
+   "vca4": 0,
+   "efm4": 0,
+   "l1mode": 0,
+   "l1mix": 0,
+   "l1oct": 0,
+   "l1rate": 6,
+   "l1wave": 0,
+   "l2mode": 0,
+   "l2mix": 0,
+   "l2oct": 0,
+   "l2rate": 0,
+   "l2wave": 0,
+   "l1fm1": 3,
+   "l2am1": 0,
+   "l1fm2": 0,
+   "l2am2": 0,
+   "l1fm3": 0,
+   "l2am3": 0,
+   "l1fm4": 0,
+   "l2am4": 0,
+   "fcut": 55,
+   "fres": 10,
+   "fshape": 0,
+   "fenv": 70,
+   "fatk": 0,
+   "fdec": 65,
+   "fsus": 0,
+   "frel": 40,
+   "ftk": 70,
+   "ftp24": 127,
+   "fmm12": 0,
+   "fnoise": 0,
+   "fmetal": 0,
+   "flfor": 0,
+   "flfow": 0,
+   "flfoi": 0,
+   "vea": 0,
+   "ved": 64,
+   "ves": 127,
+   "ver": 90
+  },
+  "note": "Two bell pairs an octave apart, each with a locked harmonic modulator. The filter envelope does the bright-to-dark decay. VCA envelope: attack 0, decay about 95, sustain 0. In OVT 2 the locked operators' knobs pick harmonics. The manual doesn't give the number mapping, so nudge them by ear. No FX."
+ },
+ {
+  "name": "Chime (AL 13, OVT 2)",
+  "values": {
+   "alg": 13,
+   "ovt": 2,
+   "vol": 100,
+   "tune1": 0,
+   "tune2": 20,
+   "tune3": 19,
+   "tune4": 28,
+   "fm12": 0,
+   "fm13": 0,
+   "fm14": 0,
+   "fm21": 56,
+   "fm23": 0,
+   "fm24": 0,
+   "fm31": 0,
+   "fm32": 0,
+   "fm34": 0,
+   "fm41": 0,
+   "fm42": 0,
+   "fm43": 49,
+   "atk1": 0,
+   "dec1": 58,
+   "sus1": 0,
+   "rel1": 58,
+   "vca1": 100,
+   "efm1": 0,
+   "atk2": 0,
+   "dec2": 83,
+   "sus2": 127,
+   "rel2": 52,
+   "vca2": 0,
+   "efm2": 0,
+   "atk3": 0,
+   "dec3": 58,
+   "sus3": 0,
+   "rel3": 58,
+   "vca3": 90,
+   "efm3": 0,
+   "atk4": 0,
+   "dec4": 83,
+   "sus4": 127,
+   "rel4": 52,
+   "vca4": 0,
+   "efm4": 0,
+   "l1mode": 0,
+   "l1mix": 0,
+   "l1oct": 0,
+   "l1rate": 6,
+   "l1wave": 0,
+   "l2mode": 0,
+   "l2mix": 0,
+   "l2oct": 0,
+   "l2rate": 0,
+   "l2wave": 0,
+   "l1fm1": 0,
+   "l2am1": 0,
+   "l1fm2": 0,
+   "l2am2": 0,
+   "l1fm3": 3,
+   "l2am3": 0,
+   "l1fm4": 0,
+   "l2am4": 0,
+   "fcut": 80,
+   "fres": 0,
+   "fshape": 0,
+   "fenv": 30,
+   "fatk": 0,
+   "fdec": 35,
+   "fsus": 0,
+   "frel": 40,
+   "ftk": 0,
+   "ftp24": 127,
+   "fmm12": 0,
+   "fnoise": 0,
+   "fmetal": 0,
+   "flfor": 0,
+   "flfow": 0,
+   "flfoi": 0,
+   "vea": 0,
+   "ved": 64,
+   "ves": 127,
+   "ver": 60
+  },
+  "note": "Short tonal chime from two locked pairs a fifth plus an octave apart. VCA envelope: attack 0, decay about 45, sustain 0. In OVT 2 the locked operators' knobs pick harmonics. The manual doesn't give the number mapping, so nudge them by ear. No FX."
+ },
+ {
+  "name": "Organ pair (AL 13, OVT 2)",
+  "values": {
+   "alg": 13,
+   "ovt": 2,
+   "vol": 100,
+   "tune1": 0,
+   "tune2": 4,
+   "tune3": 12,
+   "tune4": 8,
+   "fm12": 0,
+   "fm13": 0,
+   "fm14": 0,
+   "fm21": 21,
+   "fm23": 0,
+   "fm24": 0,
+   "fm31": 0,
+   "fm32": 0,
+   "fm34": 0,
+   "fm41": 0,
+   "fm42": 0,
+   "fm43": 17,
+   "atk1": 5,
+   "dec1": 0,
+   "sus1": 127,
+   "rel1": 25,
+   "vca1": 100,
+   "efm1": 0,
+   "atk2": 0,
+   "dec2": 64,
+   "sus2": 127,
+   "rel2": 40,
+   "vca2": 0,
+   "efm2": 0,
+   "atk3": 5,
+   "dec3": 0,
+   "sus3": 127,
+   "rel3": 25,
+   "vca3": 100,
+   "efm3": 0,
+   "atk4": 0,
+   "dec4": 64,
+   "sus4": 127,
+   "rel4": 40,
+   "vca4": 0,
+   "efm4": 0,
+   "l1mode": 0,
+   "l1mix": 0,
+   "l1oct": 0,
+   "l1rate": 38,
+   "l1wave": 0,
+   "l2mode": 0,
+   "l2mix": 0,
+   "l2oct": 0,
+   "l2rate": 0,
+   "l2wave": 0,
+   "l1fm1": 0,
+   "l2am1": 0,
+   "l1fm2": 0,
+   "l2am2": 0,
+   "l1fm3": 4,
+   "l2am3": 0,
+   "l1fm4": 0,
+   "l2am4": 0,
+   "fcut": 110,
+   "fres": 0,
+   "fshape": 0,
+   "fenv": 0,
+   "fatk": 0,
+   "fdec": 64,
+   "fsus": 127,
+   "frel": 40,
+   "ftk": 50,
+   "ftp24": 127,
+   "fmm12": 0,
+   "fnoise": 0,
+   "fmetal": 0,
+   "flfor": 0,
+   "flfow": 0,
+   "flfoi": 0,
+   "vea": 0,
+   "ved": 64,
+   "ves": 127,
+   "ver": 40
+  },
+  "note": "Sustained organ tone from two locked pairs an octave apart, with a hint of LFO shimmer. VCA envelope: attack 5, sustain max, short release. In OVT 2 the locked operators' knobs pick harmonics. The manual doesn't give the number mapping, so nudge them by ear. No FX."
+ },
+ {
+  "name": "Exact-harmonic vowel (AL 21, OVT 3)",
+  "values": {
+   "alg": 21,
+   "ovt": 3,
+   "vol": 100,
+   "tune1": 0,
+   "tune2": 24,
+   "tune3": 40,
+   "tune4": 0,
+   "fm12": 0,
+   "fm13": 0,
+   "fm14": 0,
+   "fm21": 0,
+   "fm23": 0,
+   "fm24": 0,
+   "fm31": 0,
+   "fm32": 0,
+   "fm34": 0,
+   "fm41": 77,
+   "fm42": 77,
+   "fm43": 63,
+   "atk1": 0,
+   "dec1": 110,
+   "sus1": 127,
+   "rel1": 60,
+   "vca1": 100,
+   "efm1": 0,
+   "atk2": 0,
+   "dec2": 110,
+   "sus2": 127,
+   "rel2": 60,
+   "vca2": 100,
+   "efm2": 0,
+   "atk3": 0,
+   "dec3": 110,
+   "sus3": 127,
+   "rel3": 60,
+   "vca3": 85,
+   "efm3": 0,
+   "atk4": 0,
+   "dec4": 110,
+   "sus4": 127,
+   "rel4": 60,
+   "vca4": 0,
+   "efm4": 0,
+   "l1mode": 0,
+   "l1mix": 0,
+   "l1oct": 0,
+   "l1rate": 18,
+   "l1wave": 0,
+   "l2mode": 0,
+   "l2mix": 0,
+   "l2oct": 0,
+   "l2rate": 14,
+   "l2wave": 0,
+   "l1fm1": 30,
+   "l2am1": 20,
+   "l1fm2": 20,
+   "l2am2": 0,
+   "l1fm3": 12,
+   "l2am3": 0,
+   "l1fm4": 0,
+   "l2am4": 0,
+   "fcut": 64,
+   "fres": 52,
+   "fshape": 64,
+   "fenv": 20,
+   "fatk": 0,
+   "fdec": 60,
+   "fsus": 100,
+   "frel": 40,
+   "ftk": 64,
+   "ftp24": 0,
+   "fmm12": 110,
+   "fnoise": 0,
+   "fmetal": 0,
+   "flfor": 36,
+   "flfow": 0,
+   "flfoi": 90,
+   "vea": 0,
+   "ved": 64,
+   "ves": 127,
+   "ver": 70
+  },
+  "note": "The vocal growl with the carriers locked to exact harmonics of the bases, so the formant peaks stay on integer ratios. LFO1 and a band-pass filter LFO move the vowel. VCA envelope: attack 0, sustain max, short release. In OVT 3 the locked operators' knobs pick harmonics. The manual doesn't give the number mapping, so nudge them by ear. No FX."
+ },
+ {
+  "name": "Dual drone (AL 15, OVT 3)",
+  "values": {
+   "alg": 15,
+   "ovt": 3,
+   "vol": 100,
+   "tune1": 0,
+   "tune2": 16,
+   "tune3": 16,
+   "tune4": 0,
+   "fm12": 0,
+   "fm13": 0,
+   "fm14": 0,
+   "fm21": 0,
+   "fm23": 0,
+   "fm24": 0,
+   "fm31": 0,
+   "fm32": 49,
+   "fm34": 0,
+   "fm41": 0,
+   "fm42": 42,
+   "fm43": 0,
+   "atk1": 80,
+   "dec1": 110,
+   "sus1": 127,
+   "rel1": 100,
+   "vca1": 100,
+   "efm1": 0,
+   "atk2": 80,
+   "dec2": 110,
+   "sus2": 127,
+   "rel2": 100,
+   "vca2": 95,
+   "efm2": 0,
+   "atk3": 0,
+   "dec3": 110,
+   "sus3": 127,
+   "rel3": 60,
+   "vca3": 0,
+   "efm3": 0,
+   "atk4": 0,
+   "dec4": 110,
+   "sus4": 127,
+   "rel4": 60,
+   "vca4": 0,
+   "efm4": 0,
+   "l1mode": 0,
+   "l1mix": 0,
+   "l1oct": 0,
+   "l1rate": 7,
+   "l1wave": 0,
+   "l2mode": 0,
+   "l2mix": 0,
+   "l2oct": 0,
+   "l2rate": 6,
+   "l2wave": 0,
+   "l1fm1": 4,
+   "l2am1": 30,
+   "l1fm2": 0,
+   "l2am2": 0,
+   "l1fm3": 0,
+   "l2am3": 0,
+   "l1fm4": 0,
+   "l2am4": 0,
+   "fcut": 75,
+   "fres": 20,
+   "fshape": 0,
+   "fenv": 0,
+   "fatk": 0,
+   "fdec": 64,
+   "fsus": 127,
+   "frel": 40,
+   "ftk": 50,
+   "ftp24": 127,
+   "fmm12": 0,
+   "fnoise": 0,
+   "fmetal": 0,
+   "flfor": 0,
+   "flfow": 0,
+   "flfoi": 0,
+   "vea": 0,
+   "ved": 64,
+   "ves": 127,
+   "ver": 90
+  },
+  "note": "A pure carrier next to an FM carrier fed by two modulators, with a very slow LFO drift. VCA envelope: slow attack, sustain high, long release. In OVT 3 the locked operators' knobs pick harmonics. The manual doesn't give the number mapping, so nudge them by ear. No FX."
+ },
+ {
+  "name": "Diamond bell (AL 23, OVT 3)",
+  "values": {
+   "alg": 23,
+   "ovt": 3,
+   "vol": 100,
+   "tune1": 0,
+   "tune2": 12,
+   "tune3": 20,
+   "tune4": 0,
+   "fm12": 0,
+   "fm13": 0,
+   "fm14": 0,
+   "fm21": 63,
+   "fm23": 0,
+   "fm24": 0,
+   "fm31": 56,
+   "fm32": 0,
+   "fm34": 0,
+   "fm41": 0,
+   "fm42": 56,
+   "fm43": 49,
+   "atk1": 0,
+   "dec1": 127,
+   "sus1": 0,
+   "rel1": 127,
+   "vca1": 105,
+   "efm1": 0,
+   "atk2": 0,
+   "dec2": 83,
+   "sus2": 127,
+   "rel2": 52,
+   "vca2": 0,
+   "efm2": 0,
+   "atk3": 0,
+   "dec3": 83,
+   "sus3": 127,
+   "rel3": 52,
+   "vca3": 0,
+   "efm3": 0,
+   "atk4": 0,
+   "dec4": 83,
+   "sus4": 127,
+   "rel4": 52,
+   "vca4": 0,
+   "efm4": 0,
+   "l1mode": 0,
+   "l1mix": 0,
+   "l1oct": 0,
+   "l1rate": 0,
+   "l1wave": 0,
+   "l2mode": 0,
+   "l2mix": 0,
+   "l2oct": 0,
+   "l2rate": 0,
+   "l2wave": 0,
+   "l1fm1": 0,
+   "l2am1": 0,
+   "l1fm2": 0,
+   "l2am2": 0,
+   "l1fm3": 0,
+   "l2am3": 0,
+   "l1fm4": 0,
+   "l2am4": 0,
+   "fcut": 60,
+   "fres": 0,
+   "fshape": 0,
+   "fenv": 60,
+   "fatk": 0,
+   "fdec": 70,
+   "fsus": 0,
+   "frel": 40,
+   "ftk": 70,
+   "ftp24": 127,
+   "fmm12": 0,
+   "fnoise": 0,
+   "fmetal": 0,
+   "flfor": 0,
+   "flfow": 0,
+   "flfoi": 0,
+   "vea": 0,
+   "ved": 64,
+   "ves": 127,
+   "ver": 90
+  },
+  "note": "M4 feeds two modulators that both feed the carrier, a symmetric bell. The filter envelope shapes the decay. VCA envelope: attack 0, decay about 100, sustain 0. In OVT 3 the locked operators' knobs pick harmonics. The manual doesn't give the number mapping, so nudge them by ear. No FX."
+ },
+ {
+  "name": "Two-voice FM (AL 09, OVT 4)",
+  "values": {
+   "alg": 9,
+   "ovt": 4,
+   "vol": 100,
+   "tune1": 0,
+   "tune2": 7,
+   "tune3": 16,
+   "tune4": 24,
+   "fm12": 0,
+   "fm13": 0,
+   "fm14": 0,
+   "fm21": 0,
+   "fm23": 0,
+   "fm24": 0,
+   "fm31": 0,
+   "fm32": 56,
+   "fm34": 0,
+   "fm41": 0,
+   "fm42": 0,
+   "fm43": 42,
+   "atk1": 20,
+   "dec1": 110,
+   "sus1": 127,
+   "rel1": 80,
+   "vca1": 90,
+   "efm1": 0,
+   "atk2": 20,
+   "dec2": 110,
+   "sus2": 127,
+   "rel2": 80,
+   "vca2": 100,
+   "efm2": 0,
+   "atk3": 0,
+   "dec3": 110,
+   "sus3": 127,
+   "rel3": 60,
+   "vca3": 0,
+   "efm3": 0,
+   "atk4": 0,
+   "dec4": 110,
+   "sus4": 127,
+   "rel4": 60,
+   "vca4": 0,
+   "efm4": 0,
+   "l1mode": 0,
+   "l1mix": 0,
+   "l1oct": 0,
+   "l1rate": 14,
+   "l1wave": 0,
+   "l2mode": 0,
+   "l2mix": 0,
+   "l2oct": 0,
+   "l2rate": 9,
+   "l2wave": 0,
+   "l1fm1": 0,
+   "l2am1": 0,
+   "l1fm2": 6,
+   "l2am2": 15,
+   "l1fm3": 0,
+   "l2am3": 0,
+   "l1fm4": 0,
+   "l2am4": 0,
+   "fcut": 85,
+   "fres": 15,
+   "fshape": 0,
+   "fenv": 0,
+   "fatk": 0,
+   "fdec": 64,
+   "fsus": 127,
+   "frel": 40,
+   "ftk": 0,
+   "ftp24": 127,
+   "fmm12": 0,
+   "fnoise": 0,
+   "fmetal": 0,
+   "flfor": 0,
+   "flfow": 0,
+   "flfoi": 0,
+   "vea": 0,
+   "ved": 64,
+   "ves": 127,
+   "ver": 90
+  },
+  "note": "A pure carrier plus an FM'd second carrier a fifth above (7 semitones), with locked overtone modulators. Slow LFO movement on the second voice. VCA envelope: attack about 20, sustain high. In OVT 4 the locked operators' knobs pick harmonics. The manual doesn't give the number mapping, so nudge them by ear. No FX."
+ },
+ {
+  "name": "Octave-stack lead (AL 11, OVT 4)",
+  "values": {
+   "alg": 11,
+   "ovt": 4,
+   "vol": 100,
+   "tune1": 0,
+   "tune2": 12,
+   "tune3": 8,
+   "tune4": 16,
+   "fm12": 0,
+   "fm13": 0,
+   "fm14": 0,
+   "fm21": 0,
+   "fm23": 0,
+   "fm24": 0,
+   "fm31": 49,
+   "fm32": 49,
+   "fm34": 0,
+   "fm41": 0,
+   "fm42": 0,
+   "fm43": 35,
+   "atk1": 5,
+   "dec1": 110,
+   "sus1": 127,
+   "rel1": 60,
+   "vca1": 100,
+   "efm1": 0,
+   "atk2": 5,
+   "dec2": 110,
+   "sus2": 127,
+   "rel2": 60,
+   "vca2": 85,
+   "efm2": 0,
+   "atk3": 0,
+   "dec3": 110,
+   "sus3": 127,
+   "rel3": 60,
+   "vca3": 0,
+   "efm3": 0,
+   "atk4": 0,
+   "dec4": 110,
+   "sus4": 127,
+   "rel4": 60,
+   "vca4": 0,
+   "efm4": 0,
+   "l1mode": 0,
+   "l1mix": 0,
+   "l1oct": 0,
+   "l1rate": 52,
+   "l1wave": 0,
+   "l2mode": 0,
+   "l2mix": 0,
+   "l2oct": 0,
+   "l2rate": 0,
+   "l2wave": 0,
+   "l1fm1": 5,
+   "l2am1": 0,
+   "l1fm2": 5,
+   "l2am2": 0,
+   "l1fm3": 0,
+   "l2am3": 0,
+   "l1fm4": 0,
+   "l2am4": 0,
+   "fcut": 90,
+   "fres": 0,
+   "fshape": 0,
+   "fenv": 0,
+   "fatk": 0,
+   "fdec": 64,
+   "fsus": 127,
+   "frel": 40,
+   "ftk": 64,
+   "ftp24": 127,
+   "fmm12": 0,
+   "fnoise": 0,
+   "fmetal": 0,
+   "flfor": 0,
+   "flfow": 0,
+   "flfoi": 0,
+   "vea": 0,
+   "ved": 64,
+   "ves": 127,
+   "ver": 70
+  },
+  "note": "Two carriers an octave apart sharing a modulator chain, with light vibrato. VCA envelope: attack 5, sustain high, short release. In OVT 4 the locked operators' knobs pick harmonics. The manual doesn't give the number mapping, so nudge them by ear. No FX."
+ },
+ {
+  "name": "Dark pad (AL 15, OVT 4)",
+  "values": {
+   "alg": 15,
+   "ovt": 4,
+   "vol": 100,
+   "tune1": 0,
+   "tune2": 7,
+   "tune3": 8,
+   "tune4": 12,
+   "fm12": 0,
+   "fm13": 0,
+   "fm14": 0,
+   "fm21": 0,
+   "fm23": 0,
+   "fm24": 0,
+   "fm31": 0,
+   "fm32": 42,
+   "fm34": 0,
+   "fm41": 0,
+   "fm42": 35,
+   "fm43": 0,
+   "atk1": 95,
+   "dec1": 110,
+   "sus1": 127,
+   "rel1": 110,
+   "vca1": 100,
+   "efm1": 0,
+   "atk2": 95,
+   "dec2": 110,
+   "sus2": 127,
+   "rel2": 110,
+   "vca2": 95,
+   "efm2": 0,
+   "atk3": 0,
+   "dec3": 110,
+   "sus3": 127,
+   "rel3": 60,
+   "vca3": 0,
+   "efm3": 0,
+   "atk4": 0,
+   "dec4": 110,
+   "sus4": 127,
+   "rel4": 60,
+   "vca4": 0,
+   "efm4": 0,
+   "l1mode": 0,
+   "l1mix": 0,
+   "l1oct": 0,
+   "l1rate": 7,
+   "l1wave": 0,
+   "l2mode": 0,
+   "l2mix": 0,
+   "l2oct": 0,
+   "l2rate": 9,
+   "l2wave": 0,
+   "l1fm1": 0,
+   "l2am1": 20,
+   "l1fm2": 6,
+   "l2am2": 0,
+   "l1fm3": 0,
+   "l2am3": 0,
+   "l1fm4": 0,
+   "l2am4": 0,
+   "fcut": 55,
+   "fres": 15,
+   "fshape": 0,
+   "fenv": 25,
+   "fatk": 80,
+   "fdec": 64,
+   "fsus": 127,
+   "frel": 40,
+   "ftk": 50,
+   "ftp24": 127,
+   "fmm12": 0,
+   "fnoise": 0,
+   "fmetal": 0,
+   "flfor": 5,
+   "flfow": 0,
+   "flfoi": 20,
+   "vea": 0,
+   "ved": 64,
+   "ves": 127,
+   "ver": 90
+  },
+  "note": "Slow, dark pad: two modulators into one carrier, a second carrier a fifth up, low filter cutoff with a slow swell. VCA envelope: attack about 95, sustain high, long release. In OVT 4 the locked operators' knobs pick harmonics. The manual doesn't give the number mapping, so nudge them by ear. No FX."
+ },
+ {
+  "name": "FM chord pad (AL 21, OVT 5)",
+  "values": {
+   "alg": 21,
+   "ovt": 5,
+   "vol": 100,
+   "tune1": 0,
+   "tune2": 4,
+   "tune3": 7,
+   "tune4": 8,
+   "fm12": 0,
+   "fm13": 0,
+   "fm14": 0,
+   "fm21": 0,
+   "fm23": 0,
+   "fm24": 0,
+   "fm31": 0,
+   "fm32": 0,
+   "fm34": 0,
+   "fm41": 39,
+   "fm42": 39,
+   "fm43": 39,
+   "atk1": 90,
+   "dec1": 110,
+   "sus1": 127,
+   "rel1": 100,
+   "vca1": 100,
+   "efm1": 0,
+   "atk2": 90,
+   "dec2": 110,
+   "sus2": 127,
+   "rel2": 100,
+   "vca2": 95,
+   "efm2": 0,
+   "atk3": 90,
+   "dec3": 110,
+   "sus3": 127,
+   "rel3": 100,
+   "vca3": 90,
+   "efm3": 0,
+   "atk4": 0,
+   "dec4": 110,
+   "sus4": 127,
+   "rel4": 60,
+   "vca4": 0,
+   "efm4": 0,
+   "l1mode": 0,
+   "l1mix": 0,
+   "l1oct": 0,
+   "l1rate": 11,
+   "l1wave": 0,
+   "l2mode": 0,
+   "l2mix": 0,
+   "l2oct": 0,
+   "l2rate": 8,
+   "l2wave": 0,
+   "l1fm1": 0,
+   "l2am1": 18,
+   "l1fm2": 4,
+   "l2am2": 0,
+   "l1fm3": 5,
+   "l2am3": 18,
+   "l1fm4": 0,
+   "l2am4": 0,
+   "fcut": 85,
+   "fres": 10,
+   "fshape": 0,
+   "fenv": 0,
+   "fatk": 0,
+   "fdec": 64,
+   "fsus": 127,
+   "frel": 40,
+   "ftk": 60,
+   "ftp24": 127,
+   "fmm12": 0,
+   "fnoise": 0,
+   "fmetal": 0,
+   "flfor": 0,
+   "flfow": 0,
+   "flfoi": 0,
+   "vea": 0,
+   "ved": 64,
+   "ves": 127,
+   "ver": 90
+  },
+  "note": "A major triad from three independent carriers (0, 4, 7 semitones) with a locked harmonic modulator shimmering over all three. VCA envelope: attack about 90, sustain high, long release. In OVT 5 the locked operators' knobs pick harmonics. The manual doesn't give the number mapping, so nudge them by ear. No FX."
+ },
+ {
+  "name": "Power-chord pluck (AL 19, OVT 5)",
+  "values": {
+   "alg": 19,
+   "ovt": 5,
+   "vol": 105,
+   "tune1": 0,
+   "tune2": 7,
+   "tune3": 12,
+   "tune4": 8,
+   "fm12": 0,
+   "fm13": 0,
+   "fm14": 0,
+   "fm21": 0,
+   "fm23": 0,
+   "fm24": 0,
+   "fm31": 0,
+   "fm32": 0,
+   "fm34": 0,
+   "fm41": 0,
+   "fm42": 0,
+   "fm43": 56,
+   "atk1": 0,
+   "dec1": 72,
+   "sus1": 30,
+   "rel1": 65,
+   "vca1": 100,
+   "efm1": 0,
+   "atk2": 0,
+   "dec2": 72,
+   "sus2": 30,
+   "rel2": 65,
+   "vca2": 95,
+   "efm2": 0,
+   "atk3": 0,
+   "dec3": 72,
+   "sus3": 30,
+   "rel3": 65,
+   "vca3": 90,
+   "efm3": 0,
+   "atk4": 0,
+   "dec4": 83,
+   "sus4": 127,
+   "rel4": 52,
+   "vca4": 0,
+   "efm4": 0,
+   "l1mode": 0,
+   "l1mix": 0,
+   "l1oct": 0,
+   "l1rate": 0,
+   "l1wave": 0,
+   "l2mode": 0,
+   "l2mix": 0,
+   "l2oct": 0,
+   "l2rate": 0,
+   "l2wave": 0,
+   "l1fm1": 0,
+   "l2am1": 0,
+   "l1fm2": 0,
+   "l2am2": 0,
+   "l1fm3": 0,
+   "l2am3": 0,
+   "l1fm4": 0,
+   "l2am4": 0,
+   "fcut": 75,
+   "fres": 25,
+   "fshape": 0,
+   "fenv": 55,
+   "fatk": 0,
+   "fdec": 45,
+   "fsus": 10,
+   "frel": 40,
+   "ftk": 55,
+   "ftp24": 127,
+   "fmm12": 0,
+   "fnoise": 0,
+   "fmetal": 0,
+   "flfor": 0,
+   "flfow": 0,
+   "flfoi": 0,
+   "vea": 0,
+   "ved": 64,
+   "ves": 127,
+   "ver": 60
+  },
+  "note": "Root, fifth and octave (0, 7, 12) as three carriers, with FM on the top one for edge. VCA envelope: attack 0, decay about 55, sustain low. In OVT 5 the locked operators' knobs pick harmonics. The manual doesn't give the number mapping, so nudge them by ear. No FX."
+ }
+]/*PRESETS_END*/;
+  var presetEl = $('preset');
+  var none0 = el('option', null, '(choose a preset)'); none0.value = ''; presetEl.appendChild(none0);
+  PRESETS.forEach(function (pr, idx) { var o = el('option', null, pr.name); o.value = idx; presetEl.appendChild(o); });
+  $('presetLoad').addEventListener('click', function () {
+    var pr = PRESETS[parseInt(presetEl.value, 10)];
+    if (!pr) { setStatus('Choose a preset first.', false); return; }
+    P.forEach(function (p) { if (p.scope === 'part') setValue(p.id, p.def, 'local'); });
+    Object.keys(pr.values).forEach(function (id) { if (byId.hasOwnProperty(id)) setValue(id, pr.values[id], 'local'); });
+    clearMarks();
+    $('syxName').value = pr.name.replace(/\s*\(.*$/, '').slice(0, 13);
+    $('presetNote').textContent = pr.note;
+    setStatus('Loaded "' + pr.name + '". Nothing was sent yet. Press Send all values to apply it.', true);
+  });
+
+  $('reset').addEventListener('click', function () {
+    P.forEach(function (p) { setValue(p.id, p.def, 'local'); });
+    clearMarks();
+    setStatus('Page values reset. Nothing was sent to the module.', true);
+  });
+
+  $('pcSend').addEventListener('click', function () {
+    var n = clamp(parseInt($('pc').value, 10) || 0, 0, 127);
+    if (!window.confirm('Recall program ' + n + ' on channel ' + state.chan + '? Unsaved edits on the module will be lost.')) return;
+    if (sendRaw([0xC0 | (state.chan - 1), n])) log('ch ' + state.chan + '  Program change ' + n);
+  });
+
+  $('storeOk').addEventListener('change', function () { $('store').disabled = !$('storeOk').checked; });
+  $('store').addEventListener('click', function () {
+    if (!window.confirm('Send Store (CC 62 = 64) on channel ' + state.chan + '?\n\nThis overwrites a preset on the module and cannot be undone. Check its display first.')) return;
+    if (sendRaw([0xB0 | (state.chan - 1), 62, 64])) log('ch ' + state.chan + '  CC 62 = 64  Store preset');
+    $('storeOk').checked = false; $('store').disabled = true;
+  });
+
+  /* ---------- channel + persistence ---------- */
+  for (i = 1; i <= 16; i++) { var o = el('option', null, String(i)); o.value = i; chanEl.appendChild(o); }
+  chanEl.addEventListener('change', function () { state.chan = parseInt(chanEl.value, 10); persistSoon(); updateStatus(); });
+
+  function persistSoon() {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(function () {
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ values: state.values, chan: state.chan })); } catch (e) {}
+    }, 300);
+  }
+  function restore() {
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return;
+      var d = JSON.parse(raw);
+      if (d && d.values) Object.keys(d.values).forEach(function (id) {
+        if (byId.hasOwnProperty(id) && typeof d.values[id] === 'number') setValue(id, d.values[id], 'local');
+      });
+      if (d && d.chan >= 1 && d.chan <= 16) { state.chan = d.chan; chanEl.value = d.chan; }
+    } catch (e) {}
+  }
+
+  /* ---------- MIDI ports ---------- */
+  function updateStatus() {
+    if (typeof updateSyx === 'function') updateSyx();
+    if (state.out) setStatus('Output: ' + state.out.name + '. Part channel ' + state.chan + (state.chan === 16 ? ' (shared with the global FX channel)' : '') + '.', true);
+  }
+  function findPort(map, id) {
+    var found = null;
+    map.forEach(function (p) { if (p.id === id) found = p; });
+    return found;
+  }
+  function refreshPorts() {
+    var prevOut = state.out ? state.out.id : null, prevIn = state.inp ? state.inp.id : null;
+    var outs = [], ins = [];
+    access.outputs.forEach(function (p) { outs.push(p); });
+    access.inputs.forEach(function (p) { ins.push(p); });
+    portOut.innerHTML = ''; portIn.innerHTML = '';
+    outs.forEach(function (p) { var o = el('option', null, p.name); o.value = p.id; portOut.appendChild(o); });
+    var none = el('option', null, 'None (page does not listen)'); none.value = ''; portIn.appendChild(none);
+    ins.forEach(function (p) { var o = el('option', null, p.name); o.value = p.id; portIn.appendChild(o); });
+    if (!outs.length) { state.out = null; setStatus('No MIDI outputs found. Connect the Mod FM by USB-C and reload.', false); }
+    else {
+      var pick = outs.filter(function (p) { return p.id === prevOut; })[0] ||
+                 outs.filter(function (p) { return /mod\s*fm|jomox/i.test(p.name); })[0] || outs[0];
+      state.out = pick; portOut.value = pick.id; updateStatus();
+    }
+    var keep = ins.filter(function (p) { return p.id === prevIn; })[0];
+    attachInput(keep || null);
+    portIn.value = keep ? keep.id : '';
+  }
+  function attachInput(port) {
+    if (state.inp) state.inp.onmidimessage = null;
+    state.inp = port;
+    if (port) port.onmidimessage = onIn;
+  }
+  portOut.addEventListener('change', function () { state.out = findPort(access.outputs, portOut.value); updateStatus(); });
+  portIn.addEventListener('change', function () {
+    attachInput(portIn.value ? findPort(access.inputs, portIn.value) : null);
+    if (state.inp) setStatus('Listening to ' + state.inp.name + '. This only helps if the module transmits CC when you turn its knobs.', true);
+  });
+
+  function onIn(e) {
+    var d = e.data;
+    if (d && syx.fetching) syxFeed(d);
+    if (!d || d.length < 3 || (d[0] & 0xF0) !== 0xB0) return;
+    var ch = d[0] & 0x0F, ccn = d[1], v = d[2], p = null;
+    if (ch === state.chan - 1) {
+      if (ccn === 33) { if (v <= 7) setTarget(v, false); return; }
+      p = byCC.part[ccn];
+    } else if (ch === 15) p = byCC.global[ccn];
+    if (p) setValue(p.id, v, 'remote');
+  }
+
+  /* ---------- Vary: nudge the ticked sections ----------
+     Each parameter in a ticked section moves with a probability equal to the amount, by a random step that grows with it.
+     Held always: volume, VCA envelope, OP cents, LFO mode and octave. Envelope stages move together (they share one
+     random push) so an ADSR stays recognisable. Carriers keep a level and some decay, resonance stays under 60,
+     and the filter always keeps one audible mix path, so a variation is not silent. */
+  var VSCOPES = [['fm', 'FM amounts', true], ['tune', 'Tuning', true], ['env', 'Envelopes', true], ['lvl', 'Levels', true],
+                 ['filt', 'Filter', true], ['lfo', 'LFO', true], ['fx', 'Effects', false], ['struct', 'Algorithm / overtone', false]];
+  var vOn = {}, vHist = null, HARM = [0, 12, 19, 24, 28, 31, 34, 36], GOOD_ALGS = [1, 3, 5, 7, 9, 11, 13, 14, 15, 17, 19, 21, 23];
+  VSCOPES.forEach(function (s) {
+    vOn[s[0]] = s[2];
+    var lab = el('label'), cb = el('input'); cb.type = 'checkbox'; cb.id = 'vs-' + s[0]; cb.checked = s[2];
+    cb.addEventListener('change', function () { vOn[s[0]] = cb.checked; });
+    lab.appendChild(cb); lab.appendChild(document.createTextNode(s[1]));
+    $('varyScopes').appendChild(lab);
+  });
+  $('varyAmt').addEventListener('input', function () { $('varyAmtV').textContent = $('varyAmt').value + '%'; });
+  function rnd() { return Math.random() * 2 - 1; }
+
+  function runVary() {
+    var pct = parseInt($('varyAmt').value, 10), frac = pct / 100, spread = 12 + pct * 0.6;
+    var car = carriers(), before = {}, changed = {};
+    P.forEach(function (p) { before[p.id] = state.values[p.id]; });
+    function put(id, v) { v = clamp(Math.round(v), 0, byId[id].max); if (v !== state.values[id]) { setValue(id, v, 'local'); changed[id] = 1; } }
+    function nudge(id, lo, hi, sp) { put(id, clamp(state.values[id] + rnd() * (sp || spread), lo, hi == null ? byId[id].max : hi)); }
+    function chance(k) { return Math.random() < (k == null ? frac : frac * k); }
+    var n;
+
+    if (vOn.struct) {
+      if (chance(0.5)) put('alg', GOOD_ALGS[Math.floor(Math.random() * GOOD_ALGS.length)]);
+      if (chance(0.5)) put('ovt', Math.floor(Math.random() * 6));
+    }
+    if (vOn.fm) [1, 2, 3, 4].forEach(function (a) { [1, 2, 3, 4].forEach(function (d) {
+      var id = 'fm' + a + d; if (a !== d && state.values[id] > 0 && chance()) nudge(id, 4, 127);
+    }); });
+    if (vOn.tune) {
+      var sp = 2 + pct * 0.14, snap = $('varySnap').checked, b = state.values.tune1;
+      [2, 3, 4].forEach(function (k) {
+        if (!chance()) return;
+        var id = 'tune' + k, cur = state.values[id];
+        if (snap) {
+          var rel = cur - b, idx = 0, best = 1e9;
+          HARM.forEach(function (h2, j) { if (Math.abs(h2 - rel) < best) { best = Math.abs(h2 - rel); idx = j; } });
+          put(id, b + HARM[clamp(idx + Math.round(rnd() * (1 + pct / 25)), 0, HARM.length - 1)]);
+        } else put(id, cur + Math.round(rnd() * sp));
+      });
+    }
+    if (vOn.env) {
+      [1, 2, 3, 4].forEach(function (o) {
+        if (!chance()) return;
+        var r0 = rnd();
+        ['atk', 'dec', 'sus', 'rel'].forEach(function (k) {
+          var id = k + o, push = (r0 * 0.6 + rnd() * 0.4) * spread * (k === 'sus' ? 0.6 : 1);
+          put(id, state.values[id] + push);
+        });
+        if (car.indexOf(o) >= 0 && state.values['sus' + o] < 20 && state.values['dec' + o] < 15) put('dec' + o, 15 + Math.random() * 30);
+      });
+      if (chance()) { var f0 = rnd(); ['fatk', 'fdec', 'fsus', 'frel'].forEach(function (id) { put(id, state.values[id] + (f0 * 0.6 + rnd() * 0.4) * spread * (id === 'fsus' ? 0.6 : 1)); }); }
+    }
+    if (vOn.lvl) [1, 2, 3, 4].forEach(function (o) {
+      if (car.indexOf(o) >= 0 && chance()) nudge('vca' + o, 40, 127);
+      if (state.values['efm' + o] > 0 && chance()) nudge('efm' + o, 0, 127, spread * 0.8);
+    });
+    if (vOn.filt) {
+      if (chance()) nudge('fcut', 25, 127);
+      if (chance()) nudge('fres', 0, 60);
+      if (chance()) nudge('fshape', 0, 127, spread * 0.5);
+      if (chance()) nudge('fenv', 0, 127);
+      if (chance()) nudge('ftk', 0, 127);
+      if (chance()) nudge('fnoise', 0, 60);
+      if (chance()) nudge('fmetal', 0, 127);
+      if (chance(0.5)) nudge('ftp24', 0, 127);
+      if (chance(0.5)) nudge('fmm12', 0, 127);
+      if (state.values.ftp24 < 30 && state.values.fmm12 < 30) put('ftp24', 100);
+    }
+    if (vOn.lfo) {
+      ['l1rate', 'l2rate'].forEach(function (id) { if (chance()) nudge(id, 0, 127); });
+      ['l1wave', 'l2wave'].forEach(function (id) { if (chance()) nudge(id, 0, 63, spread * 0.5); });
+      [1, 2].forEach(function (l) { if (state.values['l' + l + 'mode'] === 1 && chance()) nudge('l' + l + 'mix', 0, 127); });
+      [1, 2, 3, 4].forEach(function (o) {
+        var f = 'l1fm' + o, a = 'l2am' + o;
+        if (state.values[f] > 0 ? chance() : chance(0.3)) { if (state.values[f] === 0) put(f, 4 + Math.random() * 16); else nudge(f, 0, 127, spread * 0.5); }
+        if (car.indexOf(o) >= 0 && (state.values[a] > 0 ? chance() : chance(0.3))) { if (state.values[a] === 0) put(a, 6 + Math.random() * 24); else nudge(a, 0, 127, spread * 0.5); }
+      });
+      ['flfor', 'flfow', 'flfoi'].forEach(function (id) { if (chance()) nudge(id, 0, 127, spread * 0.6); });
+    }
+    if (vOn.fx) {
+      ['rvsize', 'rvlp', 'rvhp', 'rvlev', 'd1time', 'd1fb', 'd1lev', 'd2time', 'd2fb', 'd2lev'].forEach(function (id) { if (chance()) nudge(id, 0, 127); });
+      ['d1rng', 'd2rng'].forEach(function (id) { if (chance()) put(id, Math.floor(Math.random() * 3)); });
+    }
+
+    var ids = Object.keys(changed);
+    vHist = { before: before, ids: ids };
+    $('varyUndo').disabled = !ids.length;
+    n = ids.length;
+    if (!n) { setStatus('Nothing moved at ' + pct + '%. Raise the amount or tick more sections.', false); return; }
+    var sent = 0;
+    if ($('varySend').checked && state.out) {
+      var t0 = performance.now(), order = ids.slice().sort(function (a, b2) { return (a === 'alg' || a === 'ovt' ? 0 : 1) - (b2 === 'alg' || b2 === 'ovt' ? 0 : 1); });
+      order.forEach(function (id, i) { if (sendParam(byId[id], state.values[id], t0 + i * GAP)) { mark(id); sent++; } });
+    }
+    var held = VSCOPES.filter(function (s) { return !vOn[s[0]]; }).map(function (s) { return s[1]; });
+    log('Vary ' + pct + '%: ' + n + ' parameter(s) changed, ' + sent + ' sent');
+    setStatus('Varied ' + n + ' parameter' + (n === 1 ? '' : 's') + ' at ' + pct + '%' + (sent ? ', sent to the module' : ', page only') + (held.length ? '. Held: ' + held.join(', ') : '') + '.', true);
+  }
+  $('varyGo').addEventListener('click', runVary);
+  $('varyUndo').addEventListener('click', function () {
+    if (!vHist) return;
+    var t0 = performance.now(), i = 0, send = $('varySend').checked && state.out;
+    vHist.ids.forEach(function (id) {
+      setValue(id, vHist.before[id], 'local');
+      if (send && sendParam(byId[id], state.values[id], t0 + (i++) * GAP)) mark(id);
+    });
+    setStatus('Undid the last variation (' + vHist.ids.length + ' parameters).', true);
+    vHist = null; $('varyUndo').disabled = true;
+  });
+
+  /* ---------- SysEx: whole-preset dump ----------
+     A single preset is F0 31 3F 68 01 55, then 92 words of 3 bytes (21 bits each), then F7: 283 bytes.
+     Most settings sit one per byte, two to a word: 'hi' / 'lo' is the byte inside the word, [shift, width] is a
+     bit field inside the high byte. The word positions come from another Mod FM editor's notes (checked there
+     against a real unit); I have not verified them myself, so fetch a dump from your module and compare.
+     CC 74-77 and 70-73 are tied to the words by their CC number, because the manual's LFO labels are swapped
+     for those controllers on a real unit. */
+  var REC_WORDS = 92, SYX_LEN = 283, NAME_WORD = 79, NAME_LEN = 13, DUMP_HEAD = [0xF0, 0x31, 0x3F, 0x68, 0x01, 0x55];
+  var FIELD = {};
+  function fld(id, word, where) { FIELD[id] = { word: word, where: where }; }
+  [[24, 'hi'], [24, 'lo'], [25, 'hi'], [25, 'lo']].forEach(function (s, i) { fld('tune' + (i + 1), s[0], s[1]); });
+  [[32, 'hi'], [33, 'hi'], [34, 'hi'], [35, 'hi']].forEach(function (s, i) { fld('atk' + (i + 1), s[0], s[1]); });
+  [[32, 'lo'], [33, 'lo'], [34, 'lo'], [35, 'lo']].forEach(function (s, i) { fld('dec' + (i + 1), s[0], s[1]); });
+  [[36, 'hi'], [37, 'hi'], [38, 'hi'], [39, 'hi']].forEach(function (s, i) { fld('sus' + (i + 1), s[0], s[1]); });
+  [[36, 'lo'], [37, 'lo'], [38, 'lo'], [39, 'lo']].forEach(function (s, i) { fld('rel' + (i + 1), s[0], s[1]); });
+  [[40, 'hi'], [40, 'lo'], [41, 'hi'], [41, 'lo']].forEach(function (s, i) { fld('vca' + (i + 1), s[0], s[1]); });
+  [[42, 'hi'], [42, 'lo'], [43, 'hi'], [43, 'lo']].forEach(function (s, i) { fld('efm' + (i + 1), s[0], s[1]); });
+  [[50, 'hi'], [50, 'lo'], [51, 'hi'], [51, 'lo']].forEach(function (s, i) { fld('l1fm' + (i + 1), s[0], s[1]); });
+  [[52, 'hi'], [52, 'lo'], [53, 'hi'], [53, 'lo']].forEach(function (s, i) { fld('l2am' + (i + 1), s[0], s[1]); });
+  var FMW = { '12': [26, 'hi'], '14': [27, 'hi'], '21': [27, 'lo'], '23': [28, 'hi'], '24': [28, 'lo'],
+              '31': [29, 'hi'], '32': [29, 'lo'], '34': [30, 'hi'], '41': [30, 'lo'], '42': [31, 'hi'], '43': [31, 'lo'] };
+  Object.keys(FMW).forEach(function (k) { fld('fm' + k, FMW[k][0], FMW[k][1]); });
+  fld('cents', 62, 'hi');
+  fld('vol', 65, 'lo'); fld('alg', 22, 'lo'); fld('ovt', 54, 'lo');
+  fld('vea', 16, 'lo'); fld('ved', 17, 'lo'); fld('ves', 18, 'lo'); fld('ver', 19, 'lo');
+  fld('fcut', 0, 'lo'); fld('fres', 1, 'lo'); fld('fshape', 2, 'lo'); fld('fenv', 3, 'lo');
+  fld('fatk', 4, 'lo'); fld('fdec', 5, 'lo'); fld('fsus', 6, 'lo'); fld('frel', 7, 'lo');
+  fld('flfor', 26, 'lo'); fld('flfow', 9, 'lo'); fld('flfoi', 10, 'lo');
+  fld('ftp24', 23, 'lo'); fld('fmm12', 10, 'hi'); fld('ftk', 3, 'hi'); fld('fnoise', 11, 'hi'); fld('fmetal', 2, 'hi');
+  fld('l1mix', 55, 'lo'); fld('l2mix', 56, 'lo');
+  fld('l1rate', 44, 'lo'); fld('l2rate', 47, 'lo'); fld('l1wave', 45, 'lo'); fld('l2wave', 48, 'lo');
+  fld('l1oct', 44, [0, 3]); fld('l2oct', 47, [0, 3]); fld('l1mode', 44, [6, 1]); fld('l2mode', 47, [6, 1]);
+
+  function fieldGet(rec, f) {
+    var w = rec[f.word];
+    if (f.where === 'hi') return (w >> 8) & 255;
+    if (f.where === 'lo') return w & 255;
+    return ((w >> 8) >> f.where[0]) & ((1 << f.where[1]) - 1);
+  }
+  function fieldSet(rec, f, v) {
+    var w = rec[f.word];
+    if (f.where === 'hi') rec[f.word] = (w & ~0xFF00) | ((v & 255) << 8);
+    else if (f.where === 'lo') rec[f.word] = (w & ~0xFF) | (v & 255);
+    else {
+      var mask = ((1 << f.where[1]) - 1) << f.where[0], hi = (w >> 8) & 255;
+      hi = (hi & ~mask) | ((v << f.where[0]) & mask);
+      rec[f.word] = (w & ~0xFF00) | (hi << 8);
+    }
+  }
+  function readName(rec) {
+    var t = '', i, w, c;
+    for (i = 0; i < 7; i++) {
+      w = rec[NAME_WORD + i];
+      [w & 255, (w >> 8) & 255].forEach(function (b) { t += (b >= 32 && b < 127) ? String.fromCharCode(b) : ' '; });
+    }
+    return t.slice(0, NAME_LEN);
+  }
+  function writeName(rec, name) {
+    var t = (name || '').replace(/[^\x20-\x7e]/g, '?').slice(0, NAME_LEN), i;
+    while (t.length < NAME_LEN) t += ' ';
+    for (i = 0; i < 6; i++) rec[NAME_WORD + i] = (rec[NAME_WORD + i] & ~0xFFFF) | (t.charCodeAt(2 * i + 1) << 8) | t.charCodeAt(2 * i);
+    rec[NAME_WORD + 6] = (rec[NAME_WORD + 6] & ~0xFF) | t.charCodeAt(12);
+  }
+  function recordToValues(rec) {
+    var out = {};
+    Object.keys(FIELD).forEach(function (id) { out[id] = clamp(fieldGet(rec, FIELD[id]), 0, byId[id].max); });
+    return out;
+  }
+  function valuesToRecord(tpl, name) {
+    var rec = tpl.slice();
+    Object.keys(FIELD).forEach(function (id) { fieldSet(rec, FIELD[id], clamp(Math.round(state.values[id]), 0, byId[id].max)); });
+    writeName(rec, name);
+    return rec;
+  }
+  function encodeSingle(rec) {
+    var out = new Uint8Array(SYX_LEN), i = 0;
+    DUMP_HEAD.forEach(function (b) { out[i++] = b; });
+    rec.forEach(function (w) { out[i++] = (w >> 14) & 127; out[i++] = (w >> 7) & 127; out[i++] = w & 127; });
+    out[i++] = 0xF7;
+    return out;
+  }
+  /* Returns { records: [...], note: '' }. Handles single dumps (type 1) and banks (type 2), several messages per file. */
+  function parseSyx(bytes) {
+    var records = [], note = '', i = 0, s, e, m, body, w, k, r, perRec = REC_WORDS * 3;
+    while (true) {
+      s = bytes.indexOf(0xF0, i); if (s < 0) break;
+      e = bytes.indexOf(0xF7, s); if (e < 0) break;
+      m = bytes.slice(s, e + 1); i = e + 1;
+      if (m.length < 7 || m[1] !== 0x31 || m[3] !== 0x68) { note = 'Skipped a message that is not from a Mod FM.'; continue; }
+      if (m[4] !== 1 && m[4] !== 2) { note = 'Skipped a message of type ' + m[4] + ' (only single presets and banks are read).'; continue; }
+      body = m.slice(m[5] === 0x55 ? 6 : 5, m.length - 1);
+      if (body.length % perRec) { note = 'A dump has the wrong length (' + body.length + ' data bytes), so it was skipped.'; continue; }
+      w = [];
+      for (k = 0; k + 2 < body.length; k += 3) w.push((body[k] << 14) | (body[k + 1] << 7) | body[k + 2]);
+      for (k = 0; k < w.length; k += REC_WORDS) { r = w.slice(k, k + REC_WORDS); records.push(r); }
+    }
+    return { records: records, note: note };
+  }
+
+  var SYX_TPL_KEY = 'modfm-syx-template-v1';
+  var syx = { tpl: null, bank: null, fetching: false, buf: [], timer: null }, sysexOk = false;
+  function saveTpl() { try { localStorage.setItem(SYX_TPL_KEY, JSON.stringify(syx.tpl)); } catch (e) {} }
+  function loadTpl() {
+    try {
+      var t = JSON.parse(localStorage.getItem(SYX_TPL_KEY) || 'null');
+      if (Array.isArray(t) && t.length === REC_WORDS && t.every(function (n) { return typeof n === 'number' && n >= 0 && n < 2097152; })) syx.tpl = t;
+    } catch (e) {}
+  }
+  function updateSyx() {
+    var t = $('syxTpl'), a = $('syxAccess');
+    t.textContent = syx.tpl ? 'Template: from a dump' : 'Template: none';
+    t.className = 'tag' + (syx.tpl ? ' on' : '');
+    a.textContent = access ? (sysexOk ? 'SysEx: allowed' : 'SysEx: blocked') : 'SysEx: no MIDI';
+    a.className = 'tag' + (sysexOk ? ' on' : '');
+    $('syxSend').disabled = !(syx.tpl && sysexOk && state.out);
+    $('syxSave').disabled = !syx.tpl;
+    $('syxFetch').disabled = !sysexOk;
+  }
+  function loadRecord(rec, label) {
+    var vals = recordToValues(rec);
+    Object.keys(vals).forEach(function (id) { setValue(id, vals[id], 'local'); });
+    $('syxName').value = readName(rec).trim() || 'Programmer';
+    syx.tpl = rec.slice(); saveTpl(); clearMarks(); updateSyx();
+    setStatus('Loaded "' + $('syxName').value + '" ' + label + ' into the editor. Nothing was sent. FM 1>3 is not in a dump, so it kept the page value.', true);
+  }
+  function showRecords(res, label) {
+    if (!res.records.length) { setStatus('No Mod FM preset found. ' + res.note, false); return; }
+    if (res.records.length === 1) { syx.bank = null; $('syxBankRow').hidden = true; loadRecord(res.records[0], label); return; }
+    syx.bank = res.records;
+    var sel = $('syxBank'); sel.innerHTML = '';
+    res.records.forEach(function (r, idx) { var o = el('option', null, pad(idx) + '  ' + (readName(r).trim() || '(unnamed)')); o.value = idx; sel.appendChild(o); });
+    $('syxBankRow').hidden = false;
+    loadRecord(res.records[0], label + ' (slot 0 of ' + res.records.length + ')');
+  }
+  $('syxBankLoad').addEventListener('click', function () {
+    var idx = parseInt($('syxBank').value, 10);
+    if (syx.bank && syx.bank[idx]) loadRecord(syx.bank[idx], 'from bank slot ' + idx);
+  });
+
+  /* fetch: listen for a dump while you turn 1Prs (or BlkP) on the module. Messages can arrive in pieces. */
+  function syxFeed(d) {
+    var i, b;
+    for (i = 0; i < d.length; i++) {
+      b = d[i];
+      if (b >= 0xF8) continue;
+      if (b === 0xF0) { syx.buf = [0xF0]; continue; }
+      if (!syx.buf.length) continue;
+      syx.buf.push(b);
+      if (b === 0xF7) { var msg = new Uint8Array(syx.buf); syx.buf = []; gotDump(msg); }
+    }
+  }
+  function gotDump(msg) {
+    var res = parseSyx(msg);
+    if (!res.records.length) { setStatus((msg.length > 4 && msg[4] >= 3 && msg[4] <= 4 ? 'That was a Multi dump. Single presets (1Prs) and banks (BlkP) are read. ' : 'Ignored a message that is not a usable dump. ') + res.note + ' Still listening.', false); return; }
+    disarmFetch();
+    showRecords(res, 'fetched from the module');
+  }
+  function armFetch() {
+    if (!access || !sysexOk) { setStatus('SysEx is not allowed. Reload the page and accept the MIDI permission prompt.', false); return; }
+    var ins = [];
+    access.inputs.forEach(function (p) { ins.push(p); });
+    if (!ins.length) { setStatus('No MIDI input found. Connect the Mod FM by USB-C and reload.', false); return; }
+    syx.fetching = true; syx.buf = [];
+    ins.forEach(function (p) { p.onmidimessage = onIn; });
+    $('syxFetch').classList.add('active'); $('syxFetch').textContent = 'Listening...';
+    setStatus('Listening. On the module: Midi, Setup 3, then turn 1Prs for the current preset (or BlkP for the whole bank).', true);
+    clearTimeout(syx.timer);
+    syx.timer = setTimeout(function () { if (syx.fetching) { disarmFetch(); setStatus('Nothing received. Stopped listening.', false); } }, 120000);
+  }
+  function disarmFetch() {
+    syx.fetching = false; syx.buf = []; clearTimeout(syx.timer);
+    if (access) access.inputs.forEach(function (p) { p.onmidimessage = null; });
+    attachInput(state.inp);
+    $('syxFetch').classList.remove('active'); $('syxFetch').textContent = 'Fetch from module';
+  }
+  $('syxFetch').addEventListener('click', function () { if (syx.fetching) { disarmFetch(); setStatus('Stopped listening.', true); } else armFetch(); });
+
+  $('syxOpen').addEventListener('click', function () { $('syxFile').click(); });
+  $('syxFile').addEventListener('change', function (e) {
+    var f = e.target.files && e.target.files[0];
+    e.target.value = '';
+    if (!f) return;
+    var r = new FileReader();
+    r.onload = function () { showRecords(parseSyx(new Uint8Array(r.result)), 'from ' + f.name); };
+    r.onerror = function () { setStatus('Could not read that file.', false); };
+    r.readAsArrayBuffer(f);
+  });
+  $('syxSave').addEventListener('click', function () {
+    if (!syx.tpl) { setStatus('Fetch or open a dump first, so there is a template to build on.', false); return; }
+    var msg = encodeSingle(valuesToRecord(syx.tpl, $('syxName').value));
+    var nm = ($('syxName').value.trim() || 'preset').replace(/[^\w\- ]/g, '_');
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([msg], { type: 'application/octet-stream' }));
+    a.download = nm + '.syx';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+    setStatus('Saved ' + nm + '.syx (' + msg.length + ' bytes).', true);
+  });
+  $('syxSend').addEventListener('click', function () {
+    if (!state.out) { setStatus('No MIDI output selected.', false); return; }
+    if (!syx.tpl) { setStatus('Fetch or open a dump first, so there is a template to build on.', false); return; }
+    var slot = clamp(parseInt($('syxSlot').value, 10) || 0, 0, 127), store = $('syxStore').checked;
+    var msg = encodeSingle(valuesToRecord(syx.tpl, $('syxName').value));
+    if (msg.length !== SYX_LEN) { setStatus('Refusing to send ' + msg.length + ' bytes. A preset is exactly ' + SYX_LEN + '.', false); return; }
+    if (!window.confirm('Send "' + $('syxName').value + '" to slot ' + slot + ' on channel ' + state.chan + '?\n\nThis replaces that slot\'s working sound' + (store ? ' and then stores it, which cannot be undone.' : '. Without Store, a power cycle wipes it.') + '\nUse single mode, not multi.')) return;
+    var ch = state.chan - 1, t = performance.now();
+    sendRaw([0xC0 | ch, slot], t);
+    sendRaw(Array.prototype.slice.call(msg), t + 250);
+    sendRaw([0xB0 | ch, byId.fm13.cc, state.values.fm13], t + 700);
+    if (store) sendRaw([0xB0 | ch, 62, 64], t + 1100);
+    clearMarks(); Object.keys(FIELD).forEach(mark); mark('fm13');
+    $('syxStore').checked = false;
+    log('SysEx preset "' + $('syxName').value + '" to slot ' + slot + ' (' + msg.length + ' bytes)' + (store ? ', then Store' : ''));
+    setStatus('Sent "' + $('syxName').value + '" to slot ' + slot + (store ? ' and stored it.' : '. It is in working memory only: press Store to keep it.'), true);
+  });
+  /* Exposed so the encode/decode round trip can be tested from outside the page. */
+  window.__modfmSyx = { FIELD: FIELD, recordToValues: recordToValues, valuesToRecord: valuesToRecord, encodeSingle: encodeSingle, parseSyx: parseSyx, readName: readName };
+
+  /* ---------- go ---------- */
+  build();
+  restore();
+  loadTpl();
+  function gotAccess(a, sysex) {
+    access = a; sysexOk = sysex; refreshPorts(); a.onstatechange = refreshPorts; updateSyx();
+  }
+  if (!navigator.requestMIDIAccess) {
+    setStatus('This browser has no Web MIDI support. Use Chrome or Edge.', false);
+    updateSyx();
+  } else {
+    navigator.requestMIDIAccess({ sysex: true }).then(function (a) { gotAccess(a, true); }, function () {
+      /* SysEx refused: fall back to plain MIDI so the CC features still work. */
+      navigator.requestMIDIAccess().then(function (a) {
+        gotAccess(a, false);
+        setStatus('Connected without SysEx permission, so the whole-preset features are off. Reload and accept the prompt to enable them.', false);
+      }, function () {
+        setStatus('MIDI access was blocked. Allow it in the browser prompt and reload.', false);
+      });
+    });
+  }
+})();
+</script>
+</body>
+</html>
