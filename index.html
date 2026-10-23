@@ -633,6 +633,13 @@
         if (sendParam(byId[id], state.values[id], t0 + (i++) * GAP)) mark(id);
       });
     });
+    var fcb = $('envFilt');
+    if (fcb && fcb.checked) {
+      ['fatk', 'fdec', 'fsus', 'frel'].forEach(function (id, j) {
+        setValue(id, shape[1][j], 'local');
+        if (sendParam(byId[id], state.values[id], t0 + (i++) * GAP)) mark(id);
+      });
+    }
     var vcb = $('envVca');
     if (vcb && vcb.checked) {
       var vids = ['vea', 'ved', 'ves', 'ver'];
@@ -642,7 +649,7 @@
         vids.forEach(function (id, j) { if (sendParam(byId[id], state.values[id], t0 + i * GAP + 100 + extra + j * 25) && !extra) mark(id); });
       });
     }
-    log('Envelope "' + shape[0] + '"' + (vcb && vcb.checked ? ' + VCA envelope' : '') + ' on ' + (target === 'all' ? 'all operators' : 'OP' + target));
+    log('Envelope "' + shape[0] + '"' + (fcb && fcb.checked ? ' + filter envelope' : '') + (vcb && vcb.checked ? ' + VCA envelope' : '') + ' on ' + (target === 'all' ? 'all operators' : 'OP' + target));
     setStatus('Applied the ' + shape[0] + ' envelope to ' + (target === 'all' ? 'all four operators' : 'OP' + target) + '.', true);
   }
   function envBar() {
@@ -656,7 +663,9 @@
     bar.appendChild(sel);
     var vl = el('label', 'vcachk'), vc = el('input'); vc.type = 'checkbox'; vc.id = 'envVca'; vc.checked = true;
     vl.appendChild(vc); vl.appendChild(document.createTextNode(' + VCA env'));
-    bar.appendChild(vl);
+    var fl = el('label', 'vcachk'), fc = el('input'); fc.type = 'checkbox'; fc.id = 'envFilt'; fc.checked = true;
+    fl.appendChild(fc); fl.appendChild(document.createTextNode(' + Filter env'));
+    bar.appendChild(fl); bar.appendChild(vl);
     ENVP.forEach(function (sh) {
       var b = el('button', null, sh[0]); b.type = 'button';
       b.addEventListener('click', function () { applyEnv(sel.value, sh); });
@@ -737,6 +746,8 @@
     c.appendChild(mini(['l2am1', 'l2am2', 'l2am3', 'l2am4'], ['OP1', 'OP2', 'OP3', 'OP4']));
 
     c = panel(colC, 'Filter', 'Analog filter section. The filter LFO only modulates cutoff.');
+    c.appendChild(el('h3', null, 'Filter envelope (CC 47 / 48 / 49 / 50)'));
+    c.appendChild(adsrViz('filt', ['fatk', 'fdec', 'fsus', 'frel']));
     c.appendChild(mini(['fcut', 'fres', 'fshape', 'fenv', 'fatk', 'fdec', 'fsus', 'frel', 'ftk', 'ftp24', 'fmm12', 'fnoise', 'fmetal', 'flfor', 'flfow', 'flfoi']));
     c.appendChild(el('h3', null, 'VCA envelope (CC 59 / 60 / 61 / 62)'));
     c.appendChild(adsrViz('vca', ['vea', 'ved', 'ves', 'ver']));
